@@ -165,7 +165,7 @@ async def score_job(
         job, [r["country_code"] for r in locs], settings
     )
     gaps = eligibility.language_gaps(job, profile)
-    model = settings.model_name()
+    model = settings.scoring_model_name()
     prompt = build_prompt(
         profile.as_text(), location_facts(settings, profile), dict(job), [r["raw"] for r in locs]
     )

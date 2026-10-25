@@ -21,6 +21,8 @@ class OllamaHealth(BaseModel):
     llm_model: str
     embed_model: str
     llm_model_ready: bool = False
+    scoring_model: str | None = None
+    scoring_model_ready: bool = False
     embed_model_ready: bool = False
     error: str | None = None
 

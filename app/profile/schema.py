@@ -11,9 +11,10 @@ LanguageLevel = Literal["native", "fluent", "professional", "basic", "none"]
 
 
 class ExtractedSkill(BaseModel):
+    """Kept to two fields: answer length is most of the extraction time."""
+
     name: str = Field(min_length=1, max_length=60)
     years: float | None = Field(None, ge=0, le=60)
-    last_used: int | None = Field(None, ge=1970, le=2100)
 
 
 class SpokenLanguage(BaseModel):
@@ -27,14 +28,15 @@ class ExtractedProfile(BaseModel):
     current_title: str | None = Field(None, max_length=120)
     seniority: Seniority | None = None
     years_experience: float | None = Field(None, ge=0, le=60)
-    summary: str | None = Field(None, max_length=600)
-    skills: list[ExtractedSkill] = Field(default_factory=list, max_length=80)
-    roles: list[str] = Field(default_factory=list, max_length=20)
+    summary: str | None = Field(None, max_length=300)
+    skills: list[ExtractedSkill] = Field(default_factory=list, max_length=40)
+    roles: list[str] = Field(default_factory=list, max_length=8)
     domains: list[str] = Field(default_factory=list, max_length=12)
     languages: list[SpokenLanguage] = Field(default_factory=list, max_length=12)
 
 
 class ProfileSkill(ExtractedSkill):
+    last_used: int | None = Field(None, ge=1970, le=2100)  # from GitHub activity
     sources: list[str] = []  # provenance, e.g. "Resume", "GitHub (14 repos)"
 
 

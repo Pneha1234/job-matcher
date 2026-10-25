@@ -21,24 +21,27 @@ class SkillCheck(BaseModel):
 
 
 class JobAssessment(BaseModel):
-    required_skills: list[SkillCheck] = Field(default_factory=list, max_length=25)
-    nice_to_have_skills: list[SkillCheck] = Field(default_factory=list, max_length=25)
+    # Caps keep the answer short: on a laptop the model writes about 10-20 tokens a second,
+    # so answer length is the scoring time.
+    required_skills: list[SkillCheck] = Field(default_factory=list, max_length=10)
+    nice_to_have_skills: list[SkillCheck] = Field(default_factory=list, max_length=6)
     seniority_fit: Literal["match", "one_level_off", "two_or_more_off", "unclear"]
     domain_fit: Literal["same", "related", "different", "unclear"]
     location_language_fit: Literal["fits", "minor_issue", "blocker", "unclear"]
-    explanation: str = Field(min_length=10, max_length=600)
+    explanation: str = Field(min_length=10, max_length=320)
 
 
 SYSTEM = (
     "You compare one job posting with a candidate profile and classify the fit. Be strict "
-    "and literal. required_skills: the skills, tools and qualifications the posting says are "
-    "required (max 12), each marked matched (the profile clearly has it), partial (related or "
-    "less experience) or missing. nice_to_have_skills: ones it calls a plus or preferred. "
-    "seniority_fit compares the level the posting asks for with the candidate's. domain_fit "
-    "compares industries. location_language_fit considers where the job can be done and "
-    "spoken-language requirements, given the candidate's location facts. explanation: two or "
-    "three plain sentences on the main reasons, naming the biggest gap. Use 'unclear' when "
-    "the posting gives no basis. Reply with JSON only."
+    "and literal, and brief. required_skills: the most important skills, tools and "
+    "qualifications the posting requires (at most 8), each marked matched (the profile "
+    "clearly has it), partial (related or less experience) or missing. "
+    "nice_to_have_skills: ones it calls a plus or preferred (at most 5). seniority_fit "
+    "compares the level the posting asks for with the candidate's. domain_fit compares "
+    "industries. location_language_fit considers where the job can be done and "
+    "spoken-language requirements, given the candidate's location facts. explanation: at "
+    "most two short, plain sentences on the main reasons, naming the biggest gap. Use "
+    "'unclear' when the posting gives no basis. Reply with JSON only."
 )
 
 SENIORITY = {"match": 100, "one_level_off": 60, "two_or_more_off": 20, "unclear": None}

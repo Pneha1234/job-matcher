@@ -221,9 +221,9 @@ export function JobsView() {
         {!!today?.total && <Chip tone="acc">{today.total} new today</Chip>}
         <div className="flex-1" />
         {scoring.data?.status === "running" ? (
-          <span className="text-xs text-faint">
+          <span className="text-xs text-faint" title="Best candidates are scored first; scores appear in the list as they finish.">
             {scoring.data.progress.find((p) => p.state === "running")?.step ?? "Scoring"} ·{" "}
-            {scoring.data.progress.find((p) => p.state === "running")?.detail ?? "starting"}
+            {scoring.data.progress.find((p) => p.state === "running")?.detail ?? "starting"} · best first
           </span>
         ) : (
           summary?.profile && (

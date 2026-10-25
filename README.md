@@ -103,7 +103,7 @@ the UI polls. An APScheduler tick runs each source group on its schedule.
 |---|---|
 | Backend | Python 3.12, FastAPI, Pydantic |
 | Storage | SQLite with `sqlite-vec` |
-| LLM and embeddings | Ollama: `qwen2.5:14b` (or `llama3.1:8b`), `bge-m3` |
+| LLM and embeddings | Ollama: `qwen2.5:14b` for profiles, `qwen2.5:7b` for scoring, `bge-m3` |
 | Ingestion | httpx, python-jobspy, selectolax, PyMuPDF, python-docx, trafilatura |
 | Reference data | GeoNames `cities15000`, ECB daily rates |
 | Frontend | Next.js, TypeScript, Tailwind CSS, shadcn/ui, TanStack Query, Leaflet |
@@ -116,8 +116,9 @@ installed natively. On a Mac, run Ollama outside Docker so it can use the GPU.
 
 ```bash
 brew install ollama && brew services start ollama
-ollama pull qwen2.5:14b
-ollama pull bge-m3
+ollama pull qwen2.5:14b   # reads your resume
+ollama pull qwen2.5:7b    # scores jobs, about twice as fast
+ollama pull bge-m3        # embeddings
 ```
 
 Install dependencies and start the API (port 8000) and UI (port 3000):

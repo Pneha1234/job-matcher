@@ -10,15 +10,14 @@ from app.profile.schema import ExtractedProfile, ProfileData, ProfileSkill
 SYSTEM = (
     "You extract a candidate profile from their resume and supporting evidence. Fill every "
     "field the text supports and use null only when the text gives no basis; never invent. "
-    "current_title: the title of the most recent role. seniority: the level that title or "
-    "the experience shows (a 'Senior ...' title is senior). years_experience: total years of "
-    "professional work, counted from the role dates or stated in the text. Skill names are "
-    "short and canonical (e.g. 'PostgreSQL', 'Django REST Framework', 'Kubernetes'). A "
-    "skill's 'years' counts the years of the roles that mention it, null if no role does; "
-    "'last_used' is the last year a role mentions it. 'roles' are past job titles. "
-    "'domains' are industries such as Fintech, HR tech, E-commerce, Healthcare. 'languages' "
-    "are spoken languages only, at the level the text states. 'summary' is one or two "
-    "sentences in the third person."
+    "Be brief. current_title: the title of the most recent role. seniority: the level that "
+    "title or the experience shows (a 'Senior ...' title is senior). years_experience: total "
+    "years of professional work, counted from the role dates or stated in the text. skills: "
+    "at most 40, short canonical names (e.g. 'PostgreSQL', 'Django REST Framework', "
+    "'Kubernetes'), most important first; 'years' counts the years of the roles that mention "
+    "it, null if no role does. 'roles' are past job titles. 'domains' are industries such as "
+    "Fintech, HR tech, E-commerce, Healthcare. 'languages' are spoken languages only, at the "
+    "level the text states. 'summary' is one sentence in the third person."
 )
 
 # Names that GitHub, LinkedIn and resumes spell differently.

@@ -49,7 +49,7 @@ change whenever a decision is made or reversed (see the decision log at the end)
 | Backend | Python 3.12, FastAPI, Pydantic | Host has 3.10; install 3.12 via pyenv |
 | DB | SQLite + `sqlite-vec` | Postgres + pgvector later only if needed |
 | Scheduler | APScheduler | No Redis/Celery for a single user |
-| LLM | Ollama, `qwen2.5:14b` (fallback `llama3.1:8b`) | Run **natively** on macOS, not in Docker — Docker on Mac has no Metal GPU access. 24 GB RAM fits 14B |
+| LLM | Ollama: `qwen2.5:14b` reads resumes, `qwen2.5:7b` scores jobs | Run **natively** on macOS, not in Docker — Docker on Mac has no Metal GPU access. 24 GB RAM fits both |
 | Embeddings | `bge-m3` via Ollama | Multilingual (NL, DE, Hindi, Nepali postings) |
 | Scraping | `python-jobspy`, `httpx`, `selectolax` | schema.org JobPosting read by our own tolerant JSON-LD parser, not `extruct` |
 | Parsing | `pymupdf`, `python-docx`, `trafilatura` | |
@@ -385,3 +385,14 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   request whose Origin is another site or whose Sec-Fetch-Site is cross-site. Requests
   without those headers come from local tools and stay allowed. A login comes only if
   the app is ever hosted or shared.
+- 2026-10-26 — Speed. Measured on the owner's Mac, qwen2.5:14b writes about 10 tokens/s
+  and answer length is nearly all of the time (a 27-skill profile: 1,022 tokens, 101 s;
+  reading the 1,279-token resume took 4 s). So: (1) scoring uses a separate, smaller
+  model, `qwen2.5:7b` by default, while the 14B model keeps reading resumes, pasted
+  postings and cover letters; both can be changed in Settings. (2) Answers are capped:
+  at most 8 required and 5 nice-to-have skills and two sentences of explanation per job;
+  at most 40 skills, 8 roles and a one-sentence summary per profile. The model no longer
+  returns a per-skill "last used" year; GitHub still supplies it. (3) Jobs are scored
+  best-first and each score shows on Jobs as soon as it lands. Running several requests
+  at once (OLLAMA_NUM_PARALLEL) is a further option that needs the Ollama service
+  reconfigured; not done.

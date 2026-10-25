@@ -380,6 +380,10 @@ export function ProfileView() {
       {rescore.data && rescore.data.status !== "done" && (
         <Card className="mb-3.5 max-w-[720px]">
           <b className="text-sm">Scoring jobs against your profile</b>
+          <div className="text-xs text-muted-foreground">
+            The best candidates go first, and each score shows up on the Jobs page as soon as it&apos;s ready. You can keep using the
+            app.
+          </div>
           <Progress steps={rescore.data.progress} />
         </Card>
       )}

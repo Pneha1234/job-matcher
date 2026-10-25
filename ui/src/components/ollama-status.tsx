@@ -20,10 +20,11 @@ function describe(data: Health | undefined, failed: boolean): { tone: Tone; labe
   const { ollama, db } = data;
   if (!db.ok) return { tone: "bad", label: "Database error", detail: db.error ?? undefined };
   if (!ollama.ok) return { tone: "bad", label: "Ollama offline", detail: ollama.error ?? undefined };
-  if (!ollama.llm_model_ready || !ollama.embed_model_ready) {
+  if (!ollama.llm_model_ready || !ollama.scoring_model_ready || !ollama.embed_model_ready) {
     return { tone: "warn", label: `Ollama · ${ollama.llm_model}`, detail: ollama.error ?? undefined };
   }
-  return { tone: "ok", label: `Ollama · ${ollama.llm_model}`, detail: `v${ollama.version}` };
+  const models = ollama.scoring_model && ollama.scoring_model !== ollama.llm_model ? `${ollama.llm_model} + ${ollama.scoring_model}` : ollama.llm_model;
+  return { tone: "ok", label: `Ollama · ${models}`, detail: `v${ollama.version}` };
 }
 
 export function OllamaStatus() {

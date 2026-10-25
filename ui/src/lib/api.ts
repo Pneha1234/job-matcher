@@ -13,6 +13,8 @@ export type Health = {
     llm_model: string;
     embed_model: string;
     llm_model_ready: boolean;
+    scoring_model: string | null;
+    scoring_model_ready: boolean;
     embed_model_ready: boolean;
     error: string | null;
   };
@@ -169,6 +171,7 @@ export type AppSettings = {
   job_types: JobType[];
   min_salary: number | null;
   llm_model: string | null;
+  scoring_model: string | null;
   shortlist_size: number;
   notify_threshold: number;
   notify: boolean;

@@ -13,7 +13,10 @@ class Settings(BaseSettings):
 
     db_path: Path = REPO_ROOT / "data" / "job_matcher.db"
     ollama_url: str = "http://127.0.0.1:11434"
-    llm_model: str = "qwen2.5:14b"
+    llm_model: str = "qwen2.5:14b"  # reads resumes and pasted postings: quality matters
+    # Assesses each shortlisted job. Many short judgements, so a smaller, about twice as fast
+    # model is the better trade.
+    scoring_model: str = "qwen2.5:7b"
     embed_model: str = "bge-m3"
     # A long resume takes the 14B model about two minutes to read on a laptop, and the
     # first call after Ollama starts also loads the model into memory.

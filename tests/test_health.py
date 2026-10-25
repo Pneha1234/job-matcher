@@ -36,14 +36,14 @@ def get_health(handler) -> dict:
 
 
 def test_health_ok():
-    body = get_health(ollama_up(["qwen2.5:14b", "bge-m3:latest"]))
+    body = get_health(ollama_up(["qwen2.5:14b", "qwen2.5:7b", "bge-m3:latest"]))
     assert body["status"] == "ok"
     assert body["db"]["ok"] is True
     assert body["ollama"]["llm_model_ready"] and body["ollama"]["embed_model_ready"]
 
 
 def test_health_model_missing():
-    body = get_health(ollama_up(["bge-m3:latest"]))
+    body = get_health(ollama_up(["qwen2.5:7b", "bge-m3:latest"]))
     assert body["status"] == "degraded"
     assert body["ollama"]["ok"] is True
     assert "qwen2.5:14b" in body["ollama"]["error"]

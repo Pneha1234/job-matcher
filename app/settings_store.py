@@ -46,6 +46,7 @@ class AppSettings(BaseModel):
     job_types: list[JobType] = []  # empty = all types
     min_salary: int | None = Field(None, ge=0)  # annual, in ``currency``
     llm_model: str | None = None  # None = JM_LLM_MODEL
+    scoring_model: str | None = None  # None = JM_SCORING_MODEL
     shortlist_size: int = Field(150, ge=10, le=1000)
     notify_threshold: int = Field(85, ge=0, le=100)
     notify: bool = True
@@ -73,7 +74,12 @@ class AppSettings(BaseModel):
         return out
 
     def model_name(self) -> str:
+        """The model that reads resumes, pasted postings and writes cover letters."""
         return self.llm_model or get_settings().llm_model
+
+    def scoring_model_name(self) -> str:
+        """The model that assesses each shortlisted job."""
+        return self.scoring_model or get_settings().scoring_model
 
 
 def load(conn: sqlite3.Connection) -> AppSettings:

@@ -179,9 +179,19 @@ function ScheduleCard({ data }: { data: SettingsResponse }) {
         {hours("ats", "Company job boards (Greenhouse, Lever, Ashby, Workday…)", [12, 24, 0])}
         {hours("feeds", "Remote feeds and public APIs", [6, 12, 24, 0])}
         {hours("gentle", "Small sites (Merojob, Kumarijob, career pages)", [8, 12, 24, 0])}
-        <Field label="Scoring model">
+        <Field label="Profile model (reads your resume, once)">
           <select value={s.llm_model ?? ""} onChange={(e) => setS({ ...s, llm_model: e.target.value || null })}>
-            <option value="">Default ({data.meta.models.find((m) => m.startsWith("qwen")) ?? "qwen2.5:14b"})</option>
+            <option value="">Default (qwen2.5:14b, best quality)</option>
+            {models.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Scoring model (assesses every job)">
+          <select value={s.scoring_model ?? ""} onChange={(e) => setS({ ...s, scoring_model: e.target.value || null })}>
+            <option value="">Default (qwen2.5:7b, about 2x faster)</option>
             {models.map((m) => (
               <option key={m} value={m}>
                 {m}
