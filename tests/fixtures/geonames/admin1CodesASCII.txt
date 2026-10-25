@@ -1,0 +1,21 @@
+NL.07	North Holland	North Holland	0
+NL.11	South Holland	South Holland	0
+NL.09	Utrecht	Utrecht	0
+DE.16	Berlin	Berlin	0
+DE.02	Bavaria	Bavaria	0
+GB.ENG	England	England	0
+CA.08	Ontario	Ontario	0
+NP.B3	Bagmati Province	Bagmati Province	0
+IN.36	Uttar Pradesh	Uttar Pradesh	0
+IN.19	Karnataka	Karnataka	0
+IN.10	Haryana	Haryana	0
+IN.16	Maharashtra	Maharashtra	0
+US.NY	New York	New York	0
+US.CA	California	California	0
+US.TX	Texas	Texas	0
+US.DC	District of Columbia	District of Columbia	0
+US.MA	Massachusetts	Massachusetts	0
+US.FL	Florida	Florida	0
+FR.11	Île-de-France	Île-de-France	0
+SE.21	Gävleborg	Gävleborg	0
+IE.L	Leinster	Leinster	0

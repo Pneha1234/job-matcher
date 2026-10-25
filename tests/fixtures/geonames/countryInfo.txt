@@ -1,0 +1,13 @@
+#ISO	ISO3	ISO-Numeric	fips	Country	Capital	Area	Population	Continent
+NL	NLD	0		The Netherlands		0	0	EU									
+DE	DEU	0		Germany		0	0	EU									
+GB	GBR	0		United Kingdom		0	0	EU									
+CA	CAN	0		Canada		0	0	NA									
+NP	NPL	0		Nepal		0	0	AS									
+IN	IND	0		India		0	0	AS									
+US	USA	0		United States		0	0	NA									
+IE	IRL	0		Ireland		0	0	EU									
+FR	FRA	0		France		0	0	EU									
+SE	SWE	0		Sweden		0	0	EU									
+MA	MAR	0		Morocco		0	0	AF									
+GE	GEO	0		Georgia		0	0	AS									
