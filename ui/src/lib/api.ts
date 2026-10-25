@@ -195,7 +195,9 @@ export type SourceRow = {
   group: string;
   needs_searches: boolean;
   platform: string | null;
-  health: "ok" | "warn" | "broken" | "paused" | "never";
+  health: "ok" | "warn" | "broken" | "paused" | "never" | "needs_key";
+  key_help: string | null;
+  has_key: boolean;
   detail: string | null;
   paused: boolean;
   paused_until: string | null;

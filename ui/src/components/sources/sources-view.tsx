@@ -15,6 +15,7 @@ const HEALTH: Record<SourceRow["health"], { tone: "ok" | "warn" | "bad" | "plain
   broken: { tone: "bad", label: "Broken" },
   paused: { tone: "plain", label: "Paused" },
   never: { tone: "plain", label: "Not run yet" },
+  needs_key: { tone: "plain", label: "Needs a free key" },
 };
 
 function RunButton({ row }: { row: SourceRow }) {
@@ -40,7 +41,7 @@ function RunButton({ row }: { row: SourceRow }) {
   return (
     <Btn
       className="text-xs"
-      disabled={running || row.paused}
+      disabled={running || row.paused || row.health === "needs_key"}
       onClick={async () => setTaskId((await apiSend<{ task_id: number }>(`/sources/${row.name}/run`, "POST")).task_id)}
     >
       {running ? "Running…" : "Run now"}
@@ -74,7 +75,8 @@ function Companies() {
     <Card className="mt-4">
       <b>Company boards</b>
       <div className="mb-2 text-xs text-muted-foreground">
-        Greenhouse, Lever, Ashby, Workable, Recruitee, Personio, SmartRecruiters and Workday boards, or any careers page with job markup.
+        Greenhouse, Lever, Ashby, Workable, Recruitee, Personio, SmartRecruiters, Teamtailor and Workday boards, or any careers page with job
+        markup.
         Jobs that link to a board add it here on their own.
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -177,7 +179,13 @@ export function SourcesView() {
                   <td className="border-b border-border px-3 py-2.5">
                     <b>{row.label}</b>
                     <div className="text-xs text-faint">{row.via}</div>
-                    {row.detail && row.health !== "ok" && <div className="max-w-[360px] text-xs text-bad">{row.detail}</div>}
+                    {row.health === "needs_key" ? (
+                      <Link href="/settings" className="text-xs text-primary">
+                        Add its free key in Settings
+                      </Link>
+                    ) : (
+                      row.detail && row.health !== "ok" && <div className="max-w-[360px] text-xs text-bad">{row.detail}</div>
+                    )}
                   </td>
                   <td className="border-b border-border px-3 py-2.5">
                     <Chip tone={h.tone}>{h.label}</Chip>

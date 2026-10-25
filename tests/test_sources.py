@@ -44,7 +44,7 @@ def handler_for(routes: dict):
         calls.append(str(request.url))
         for prefix, reply in routes.items():
             if str(request.url).startswith(prefix):
-                return reply() if callable(reply) else reply
+                return reply(request) if callable(reply) else reply
         return httpx.Response(404, text="not found")
 
     handler.calls = calls
@@ -393,3 +393,79 @@ def test_listing_board(tmp_path):
     result, calls = run(conn, "jobejee", routes)
     assert result["found"] == 1 and job in calls
     assert not any(c.endswith("/about") for c in calls)
+
+
+TEAMTAILOR_RSS = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:tt="https://teamtailor.com/locations"><channel><title>Acme</title>
+<item><title>Backend Engineer</title><description>&lt;p&gt;Python&lt;/p&gt;</description>
+<pubDate>Fri, 24 Oct 2026 09:05:16 +0200</pubDate>
+<link>https://acme.teamtailor.com/jobs/1-backend-engineer</link>
+<remoteStatus>fully</remoteStatus><guid>g-1</guid>
+<tt:locations><tt:location><tt:city>Stockholm</tt:city><tt:country>Sweden</tt:country>
+</tt:location></tt:locations></item></channel></rss>"""
+
+
+def test_teamtailor_board(tmp_path):
+    conn = init_db(tmp_path / "jm.db")
+    with conn:
+        conn.execute(
+            "INSERT INTO companies (name, platform, slug) "
+            "VALUES ('Acme', 'teamtailor', 'acme.teamtailor.com')"
+        )
+    rss = {"https://acme.teamtailor.com/jobs.rss": httpx.Response(200, text=TEAMTAILOR_RSS)}
+    result, _ = run(conn, "teamtailor", rss)
+    job = conn.execute("SELECT * FROM jobs").fetchone()
+    loc = conn.execute("SELECT city, country_code FROM job_locations").fetchone()
+    assert result["found"] == 1 and job["work_mode"] == "remote"
+    assert loc["country_code"] == "SE"  # Stockholm isn't in the test GeoNames extract
+    assert board_from_url("https://acme.teamtailor.com/jobs/1") == (
+        "teamtailor",
+        "acme.teamtailor.com",
+    )
+
+
+def test_keyed_source_without_a_key_is_skipped_not_broken(tmp_path):
+    conn = init_db(tmp_path / "jm.db")
+    result, calls = run(conn, "adzuna", {})
+    assert result["status"] == "needs_key" and calls == []
+    assert conn.execute("SELECT COUNT(*) FROM scrape_runs").fetchone()[0] == 0
+
+
+def test_adzuna_with_key(tmp_path):
+    from app.settings_store import set_value
+
+    conn = init_db(tmp_path / "jm.db")
+    set_value(conn, "api_keys", {"adzuna": "id123:key456"})
+    with conn:
+        conn.execute(
+            "INSERT INTO saved_searches (name, filters) VALUES "
+            '(\'x\', \'{"query": "Python developer", "location": "Amsterdam"}\')'
+        )
+    payload = {
+        "results": [
+            {"id": 9, "redirect_url": "https://adzuna.example/9", "title": "Python Developer",
+             "company": {"display_name": "Acme"}, "description": "Python and Django work.",
+             "location": {"display_name": "Amsterdam"}, "contract_time": "full_time",
+             "salary_min": 60000, "salary_max": 70000, "salary_is_predicted": "1",
+             "created": "2026-10-20T10:00:00Z"},
+        ]
+    }  # fmt: skip
+    seen = []
+
+    def adzuna(request):
+        seen.append(request.url)
+        return httpx.Response(200, json=payload)
+
+    result, _ = run(conn, "adzuna", {"https://api.adzuna.com": adzuna})
+    job = conn.execute("SELECT * FROM jobs").fetchone()
+    assert result["found"] == 1 and "/jobs/nl/search/1" in str(seen[0])
+    assert seen[0].params["app_id"] == "id123"
+    assert job["salary_min"] is None  # predicted salaries are not real salaries
+    assert job["job_type"] == "full-time"
+
+
+def test_reed_dates_are_day_first():
+    from app.sources.keyed import _reed_date
+
+    assert _reed_date("25/10/2026").date().isoformat() == "2026-10-25"
+    assert _reed_date(None) is None

@@ -4,6 +4,7 @@ a job missing from its board on two runs in a row expires."""
 import re
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 
 from app.normalize.classify import html_to_text
 from app.sources.base import FetchContext, FetchResult, NotFound, RawJob, Source
@@ -427,8 +428,51 @@ class Workday(BoardSource):
         return out
 
 
+class Teamtailor(BoardSource):
+    """Teamtailor career sites publish every open job as RSS. Slug = the site's host."""
+
+    name = "teamtailor"
+    label = "Teamtailor"
+    via = "RSS feed"
+    platform = "teamtailor"
+    NS = "{https://teamtailor.com/locations}"
+
+    async def board(self, ctx, slug, company):
+        text = await ctx.http.get_text(f"https://{slug}/jobs.rss")
+        if "<rss" not in text[:500]:
+            raise NotFound(slug)
+        root = ET.fromstring(text)
+        name = root.findtext("channel/title") or company
+        out = []
+        for item in root.iter("item"):
+            places = [
+                ", ".join(filter(None, [loc.findtext(f"{self.NS}city"),
+                                        loc.findtext(f"{self.NS}country")]))  # fmt: skip
+                for loc in item.iter(f"{self.NS}location")
+            ]
+            status = (item.findtext("remoteStatus") or "").lower()
+            pub = item.findtext("pubDate")
+            out.append(
+                RawJob(
+                    source=self.name,
+                    source_job_id=item.findtext("guid") or item.findtext("link") or "",
+                    url=item.findtext("link") or "",
+                    title=item.findtext("title") or "",
+                    company=name,
+                    description=html_to_text(item.findtext("description")),
+                    locations=[p for p in places if p],
+                    remote=status == "fully" or None,
+                    job_type_raw=None,
+                    posted_at=parsedate_to_datetime(pub) if pub else None,
+                    extra={"remote_status": status} if status else {},
+                )
+            )
+        return out
+
+
 ATS_SOURCES: list[type[BoardSource]] = [
     Greenhouse, Lever, Ashby, Workable, Recruitee, Personio, SmartRecruiters, Workday,
+    Teamtailor,
 ]  # fmt: skip
 
 # Board URL patterns for "add a company" and self-growth from scraped links.
@@ -442,4 +486,5 @@ BOARD_PATTERNS = [
     (r"([\w-]+)\.recruitee\.com", "recruitee"),
     (r"([\w-]+)\.jobs\.personio\.(?:de|com)", "personio"),
     (r"(?:jobs|careers)\.smartrecruiters\.com/([\w-]+)", "smartrecruiters"),
+    (r"([\w-]+\.teamtailor\.com)", "teamtailor"),
 ]  # fmt: skip

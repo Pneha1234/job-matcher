@@ -10,6 +10,7 @@ import httpx
 from app.config import get_settings
 from app.lifecycle.expiry import record_listing
 from app.normalize.ingest import Normaliser, upsert
+from app.settings_store import get_value
 from app.settings_store import load as load_settings
 from app.sources import registry
 from app.sources.ats import BOARD_PATTERNS
@@ -24,6 +25,11 @@ def saved_searches(conn: sqlite3.Connection) -> list[dict]:
         "SELECT filters FROM saved_searches WHERE is_archived = 0 ORDER BY position, id"
     ).fetchall()
     return [loads(r["filters"], {}) for r in rows]
+
+
+def api_keys(conn: sqlite3.Connection) -> dict[str, str]:
+    """Free sign-up keys, kept only in the local database."""
+    return get_value(conn, "api_keys", {}) or {}
 
 
 def source_state(conn: sqlite3.Connection, name: str) -> dict:
@@ -79,6 +85,10 @@ async def run_source(
 ) -> dict:
     source = registry.get(name)
     settings = load_settings(conn)
+    api_key = api_keys(conn).get(name)
+    if source.key_help and not api_key:
+        # Not an error: the source simply isn't set up. No run is logged.
+        return {"source": name, "status": "needs_key", "reason": "Add a free API key in Settings"}
     state = source_state(conn, name)
     if state["status"] == "paused":
         until = state.get("paused_until")
@@ -112,6 +122,7 @@ async def run_source(
         searches=saved_searches(conn),
         target_countries=settings.target_countries,
         companies=companies,
+        api_key=api_key,
     )
     status, error_text, result = "ok", None, None
     try:

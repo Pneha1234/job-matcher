@@ -10,7 +10,9 @@ from app.matching.service import reweight
 from app.normalize import fx, geo
 from app.normalize.regions import CITY_GROUPS, REGIONS
 from app.profile import store
-from app.settings_store import AppSettings, Weights, get_value, load, save
+from app.settings_store import AppSettings, Weights, get_value, load, save, set_value
+from app.sources.registry import SOURCES
+from app.sources.runner import api_keys
 from app.util import dumps, loads
 
 router = APIRouter(tags=["settings"])
@@ -184,3 +186,23 @@ async def refresh_fx(db: DbDep):
     rates = await fx.refresh(db)
     _reconvert_salaries(db, load(db).currency)
     return {"currencies": len(rates)}
+
+
+class KeyIn(BaseModel):
+    source: str = Field(min_length=1, max_length=40)
+    value: str = Field("", max_length=400)
+
+
+@router.put("/settings/keys")
+async def set_key(db: DbDep, body: KeyIn):
+    """Free sign-up keys live only in the local database. An empty value removes a key."""
+    source = SOURCES.get(body.source)
+    if not source or not source.key_help:
+        raise HTTPException(404, "That source doesn't take a key")
+    keys = api_keys(db)
+    if body.value.strip():
+        keys[body.source] = body.value.strip()
+    else:
+        keys.pop(body.source, None)
+    set_value(db, "api_keys", keys)
+    return {"source": body.source, "has_key": body.source in keys}

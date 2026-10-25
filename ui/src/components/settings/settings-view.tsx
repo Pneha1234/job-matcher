@@ -6,7 +6,17 @@ import { useEffect, useState } from "react";
 import { Btn, Card, Check, Chip, Field } from "@/components/bits";
 import { PreferencesForm, useSettings } from "@/components/profile/preferences";
 import { useToast } from "@/components/toast";
-import { apiGet, apiSend, ApiError, useTask, type AppSettings, type SavedSearch, type SettingsResponse, type Weights } from "@/lib/api";
+import {
+  apiGet,
+  apiSend,
+  ApiError,
+  useTask,
+  type AppSettings,
+  type SavedSearch,
+  type SettingsResponse,
+  type SourceRow,
+  type Weights,
+} from "@/lib/api";
 import { scoreTone } from "@/lib/format";
 
 const DEFAULT_WEIGHTS: Weights = { required: 50, nice: 15, seniority: 15, domain: 10, location: 10 };
@@ -208,6 +218,59 @@ function ScheduleCard({ data }: { data: SettingsResponse }) {
   );
 }
 
+function KeysCard() {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const { data } = useQuery({
+    queryKey: ["sources"],
+    queryFn: () => apiGet<{ sources: SourceRow[] }>("/sources"),
+  });
+  const [values, setValues] = useState<Record<string, string>>({});
+  const keyed = (data?.sources ?? []).filter((s) => s.key_help);
+  async function save(source: SourceRow, value: string) {
+    await apiSend("/settings/keys", "PUT", { source: source.name, value });
+    setValues((v) => ({ ...v, [source.name]: "" }));
+    qc.invalidateQueries({ queryKey: ["sources"] });
+    toast(value ? `Saved the ${source.label} key` : `Removed the ${source.label} key`);
+  }
+  return (
+    <Card>
+      <b>Free API keys</b>
+      <div className="mb-2 text-xs text-muted-foreground">
+        Optional sources with a free sign-up and a daily limit. Keys stay in the local database.
+      </div>
+      {keyed.map((s) => (
+        <div key={s.name} className="border-b border-border py-2">
+          <div className="flex items-center gap-2">
+            <span className="flex-1 font-medium">{s.label}</span>
+            {s.has_key ? <Chip tone="ok">Key saved</Chip> : <Chip>No key</Chip>}
+          </div>
+          <div className="text-xs text-faint">{s.key_help}</div>
+          <div className="mt-1.5 flex gap-2">
+            <input
+              type="password"
+              autoComplete="off"
+              className="flex-1"
+              aria-label={`${s.label} key`}
+              placeholder={s.has_key ? "Paste a new key to replace it" : "Paste the key"}
+              value={values[s.name] ?? ""}
+              onChange={(e) => setValues((v) => ({ ...v, [s.name]: e.target.value }))}
+            />
+            <Btn disabled={!(values[s.name] ?? "").trim()} onClick={() => save(s, values[s.name].trim())}>
+              Save
+            </Btn>
+            {s.has_key && (
+              <Btn variant="ghost" onClick={() => save(s, "")}>
+                Remove
+              </Btn>
+            )}
+          </div>
+        </div>
+      ))}
+    </Card>
+  );
+}
+
 function DataCard({ data }: { data: SettingsResponse }) {
   const qc = useQueryClient();
   const toast = useToast();
@@ -257,6 +320,7 @@ export function SettingsView() {
           <SearchesCard />
           <PreferencesForm />
           <ScheduleCard data={data} />
+          <KeysCard />
           <DataCard data={data} />
         </div>
       )}

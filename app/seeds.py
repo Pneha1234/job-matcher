@@ -18,11 +18,12 @@ SEED_COMPANIES = {
     "workable": ["cloudfactory"],  # CloudFactory: Kathmandu-founded
     "recruitee": ["bunq"],
     "personio": ["personio"],
+    "teamtailor": ["career.teamtailor.com"],
 }  # fmt: skip
 
 NAMES = {"automatticcareers": "Automattic", "grafanalabs": "Grafana Labs", "n26": "N26",
          "openai": "OpenAI", "posthog": "PostHog", "gitlab": "GitLab", "mongodb": "MongoDB",
-         "cloudfactory": "CloudFactory"}  # fmt: skip
+         "cloudfactory": "CloudFactory", "career.teamtailor.com": "Teamtailor"}  # fmt: skip
 
 
 def seed(conn: sqlite3.Connection) -> int:

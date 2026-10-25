@@ -131,6 +131,7 @@ class PoliteClient:
         *,
         params: dict | None = None,
         json_body: Any = None,
+        form: dict | None = None,
         headers: dict | None = None,
         cache_ttl_s: float | None = None,
     ) -> httpx.Response:
@@ -154,7 +155,7 @@ class PoliteClient:
         self.requests += 1
         try:
             r = await self._client.request(
-                method, url, params=params, json=json_body, headers=headers
+                method, url, params=params, json=json_body, data=form, headers=headers
             )
         finally:
             self._last = time.monotonic()
@@ -211,6 +212,7 @@ class FetchContext:
     target_countries: list[str]
     companies: list[dict]  # rows from the companies table for this platform
     limit: int | None = None  # cap on items per run (gentle sources)
+    api_key: str | None = None  # for sources with a free sign-up key
 
 
 SourceKind = Literal["feed", "ats", "scrape", "crawl"]
@@ -225,6 +227,8 @@ class Source(ABC):
     daily_budget: ClassVar[int] = 200
     platform: ClassVar[str | None] = None  # company platform this source crawls
     needs_searches: ClassVar[bool] = False
+    # Sources that need a free sign-up key: where to get it and the format to paste.
+    key_help: ClassVar[str | None] = None
 
     @abstractmethod
     async def fetch(self, ctx: FetchContext) -> FetchResult: ...

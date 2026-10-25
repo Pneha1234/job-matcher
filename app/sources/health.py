@@ -5,9 +5,14 @@ import statistics
 from datetime import date
 
 from app.sources.registry import SOURCES
+from app.sources.runner import api_keys
 
 
-def _health(state: dict | None, runs: list[sqlite3.Row]) -> tuple[str, str | None]:
+def _health(
+    state: dict | None, runs: list[sqlite3.Row], missing_key: str | None = None
+) -> tuple[str, str | None]:
+    if missing_key:
+        return "needs_key", missing_key
     if state and state["status"] == "paused":
         return "paused", state["paused_reason"]
     if not runs:
@@ -45,6 +50,7 @@ def source_rows(conn: sqlite3.Connection, running: dict[str, int]) -> list[dict]
             "GROUP BY platform"
         )
     }
+    keys = api_keys(conn)
     out = []
     for name, src in SOURCES.items():
         runs = conn.execute(
@@ -52,7 +58,8 @@ def source_rows(conn: sqlite3.Connection, running: dict[str, int]) -> list[dict]
             "ORDER BY id DESC LIMIT 7",
             (name,),
         ).fetchall()
-        health, detail = _health(states.get(name), runs)
+        missing = f"Free key: {src.key_help}" if src.key_help and name not in keys else None
+        health, detail = _health(states.get(name), runs, missing)
         label = src.label
         if src.platform and src.platform != "jsonld":
             label = f"{src.label} ({boards.get(src.platform, 0)} companies)"
@@ -67,6 +74,8 @@ def source_rows(conn: sqlite3.Connection, running: dict[str, int]) -> list[dict]
                 "kind": src.kind,
                 "group": src.group,
                 "needs_searches": src.needs_searches,
+                "key_help": src.key_help,
+                "has_key": name in keys,
                 "platform": src.platform,
                 "health": health,
                 "detail": detail,

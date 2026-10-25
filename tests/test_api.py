@@ -177,3 +177,17 @@ def test_insights(client, db):
     assert data["stats"]["applied_30d"] == 1
     assert data["missing_skills"][0]["skill"] == "Kubernetes"
     assert len(data["per_day"]) == 14
+
+
+def test_api_keys_are_set_from_settings_and_shown_on_sources(client):
+    row = next(s for s in client.get("/sources").json()["sources"] if s["name"] == "jooble")
+    assert row["health"] == "needs_key" and row["key_help"]
+    assert client.put("/settings/keys", json={"source": "jooble", "value": "k"}).json()["has_key"]
+    row = next(s for s in client.get("/sources").json()["sources"] if s["name"] == "jooble")
+    assert row["has_key"] and row["health"] == "never"
+    assert (
+        client.put("/settings/keys", json={"source": "remotive", "value": "k"}).status_code == 404
+    )
+    assert not client.put("/settings/keys", json={"source": "jooble", "value": ""}).json()[
+        "has_key"
+    ]
