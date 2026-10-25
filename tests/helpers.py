@@ -15,7 +15,10 @@ def add_job(db, n: int, **kw) -> int:
         url=f"https://example.com/{n}",
         title=f"Python Developer {n}",
         company=f"Company {n}",
-        description="Python Django PostgreSQL backend services.",
+        description=(
+            "We build backend services in Python with Django and PostgreSQL. You will design "
+            "APIs, own features end to end and run them in production."
+        ),
         locations=["Amsterdam"],
     )
     base.update(kw)

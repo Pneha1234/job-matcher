@@ -56,6 +56,9 @@ class JobSpySource(Source):
     needs_searches = True
     site: ClassVar[str]
     uses_country: ClassVar[bool] = False
+    results_per_search: ClassVar[int] = RESULTS_PER_SEARCH
+    # LinkedIn's guest listing has no description; fetching it costs one page per job.
+    fetch_description: ClassVar[bool] = False
 
     async def fetch(self, ctx: FetchContext) -> FetchResult:
         result = FetchResult()
@@ -76,9 +79,10 @@ class JobSpySource(Source):
                 site_name=[self.site],
                 search_term=search["query"],
                 location=location,
-                results_wanted=RESULTS_PER_SEARCH,
+                results_wanted=self.results_per_search,
                 hours_old=HOURS_OLD,
                 description_format="markdown",
+                fetch_description=self.fetch_description,
                 verbose=0,
             )
             if self.uses_country:
@@ -146,6 +150,8 @@ class LinkedInGuest(JobSpySource):
     via = "JobSpy"
     site = "linkedin"
     daily_budget = 20
+    results_per_search = 25
+    fetch_description = True
 
 
 class Indeed(JobSpySource):

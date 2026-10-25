@@ -141,3 +141,12 @@ def test_weights_change_rerank(client, db):
     assert client.put("/settings", json=s).json()["reweighted"] == 1
     after = client.get("/jobs").json()["items"][0]["match"]["pct"]
     assert after == 62 and after != before
+
+
+def test_job_without_description_is_unscored_without_an_llm_call(client, db, fake_ollama):
+    job_id = add_job(db, 1, description="")
+    save_profile(db)
+    task = wait_task(client, client.post(f"/jobs/{job_id}/score").json()["task_id"])
+    assert task["result"]["status"] == "unscored"
+    assert "no description" in task["result"]["error"]
+    assert not [c for c in fake_ollama.calls if "messages" in c]

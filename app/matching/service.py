@@ -167,11 +167,15 @@ async def score_job(
         profile.as_text(), location_facts(settings, profile), dict(job), [r["raw"] for r in locs]
     )
     row: dict = {"status": "unscored", "model": model, "similarity": similarity}
-    try:
-        a = await ollama.generate_json(prompt, JobAssessment, system=SYSTEM, model=model)
-    except LLMError as e:
-        row["error"] = str(e)[:500]
+    a: JobAssessment | None = None
+    if len((job["description"] or "").strip()) < 80:
+        row["error"] = "The source gave no description to compare. Open the posting to judge it."
     else:
+        try:
+            a = await ollama.generate_json(prompt, JobAssessment, system=SYSTEM, model=model)
+        except LLMError as e:
+            row["error"] = str(e)[:500]
+    if a is not None:
         subs = sub_scores(a, location, gaps)
         pct = final_pct(subs, settings.weights)
         missing = [c.skill for c in a.required_skills if c.status == "missing"] + [

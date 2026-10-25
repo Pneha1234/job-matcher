@@ -10,11 +10,13 @@ import json
 import random
 import sqlite3
 import time
+import urllib.robotparser
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, ClassVar, Literal
+from urllib.parse import urlsplit
 
 import httpx
 from pydantic import BaseModel, Field
@@ -92,6 +94,7 @@ class PoliteClient:
         self.cache_ttl_s = get_settings().http_cache_ttl_s if cache_ttl_s is None else cache_ttl_s
         self.requests = 0
         self._last = 0.0
+        self._robots: dict[str, urllib.robotparser.RobotFileParser] = {}
         self._client = httpx.AsyncClient(
             headers={"User-Agent": USER_AGENT, "Accept-Language": "en"},
             timeout=40,
@@ -178,6 +181,20 @@ class PoliteClient:
                 )
             )
         return r
+
+    async def allowed(self, url: str) -> bool:
+        """robots.txt check for HTML crawling, one robots fetch per host per day."""
+        parts = urlsplit(url)
+        host = f"{parts.scheme}://{parts.netloc}"
+        if host not in self._robots:
+            parser = urllib.robotparser.RobotFileParser()
+            try:
+                text = await self.get_text(f"{host}/robots.txt", cache_ttl_s=24 * 3600)
+                parser.parse(text.splitlines())
+            except NotFound:
+                parser.parse([])  # no robots.txt: everything is allowed
+            self._robots[host] = parser
+        return self._robots[host].can_fetch(USER_AGENT, url)
 
     async def get_json(self, url: str, **kw) -> Any:
         return (await self.request("GET", url, **kw)).json()

@@ -1,6 +1,7 @@
-"""schema.org JobPosting crawling: Nepali boards via their sitemaps, and company career
-pages. Small sites are crawled gently: a capped number of new pages per run, and the
-sitemap itself (one request) confirms which known postings are still listed."""
+"""schema.org JobPosting crawling (JSON-LD or microdata): Nepali and Indian boards via
+their sitemaps or listing pages, and company career pages. Boards are crawled gently: a
+capped number of new posting pages per run, and the sitemap itself confirms which known
+postings are still listed. Only pages robots.txt allows are fetched."""
 
 import gzip
 import html
@@ -8,6 +9,8 @@ import json
 import re
 import xml.etree.ElementTree as ET
 from urllib.parse import urljoin, urlparse
+
+from selectolax.lexbor import LexborHTMLParser
 
 from app.normalize.classify import html_to_text
 from app.sources.ats import _dt
@@ -61,7 +64,43 @@ def job_postings(html: str) -> list[dict]:
         data = _loads_lenient(block.strip())
         if data is not None:
             walk(data)
-    return found
+    return found or microdata_postings(html)
+
+
+def _microdata_item(node) -> dict:
+    """Collect the itemprops whose nearest itemscope is ``node``."""
+    item: dict = {}
+    for prop in node.css("[itemprop]"):
+        owner = prop.parent
+        while owner is not None and "itemscope" not in owner.attributes:
+            owner = owner.parent
+        if owner is None or owner.mem_id != node.mem_id:
+            continue
+        key = prop.attributes.get("itemprop") or ""
+        if "itemscope" in prop.attributes:
+            value = _microdata_item(prop)
+        elif prop.attributes.get("content") is not None:
+            value = prop.attributes["content"]
+        elif prop.tag in ("a", "link"):
+            value = prop.attributes.get("href") or prop.text(strip=True)
+        else:
+            value = prop.html if key == "description" else prop.text(strip=True)
+        current = item.get(key)
+        # A posting's own description is the longest one inside it.
+        if current is None or (key == "description" and len(str(value)) > len(str(current))):
+            item[key] = value
+    return item
+
+
+def microdata_postings(html: str) -> list[dict]:
+    if "schema.org/JobPosting" not in html:
+        return []
+    tree = LexborHTMLParser(html)
+    return [
+        _microdata_item(node)
+        for node in tree.css("[itemscope]")
+        if (node.attributes.get("itemtype") or "").endswith("/JobPosting")
+    ]
 
 
 def _text(value) -> str:
@@ -93,8 +132,8 @@ def _places(posting: dict) -> list[str]:
 
 
 def raw_from_posting(posting: dict, url: str, source: str, **kw) -> RawJob | None:
-    title = html.unescape(_text(posting.get("title"))).strip()
-    org = html.unescape(_text(posting.get("hiringOrganization"))).strip()
+    title = re.sub(r"\s+", " ", html.unescape(_text(posting.get("title")))).strip()
+    org = re.sub(r"\s+", " ", html.unescape(_text(posting.get("hiringOrganization")))).strip()
     if not title or not org:
         return None
     salary = posting.get("baseSalary") or {}
@@ -123,9 +162,17 @@ def raw_from_posting(posting: dict, url: str, source: str, **kw) -> RawJob | Non
         salary_currency=salary.get("currency") if isinstance(salary, dict) else None,
         salary_period=(unit or "").lower() or None,
         posted_at=_dt(posting.get("datePosted")),
-        valid_through=_dt(posting.get("validThrough")),
+        valid_through=_deadline(posting.get("validThrough")),
         **kw,
     )
+
+
+def _deadline(value):
+    """A deadline without a time of day ("2026-10-27") lasts until the end of that day."""
+    dt = _dt(value)
+    if dt and dt.hour == dt.minute == dt.second == 0 and not re.search(r"T\d", str(value)):
+        dt = dt.replace(hour=23, minute=59, second=59)
+    return dt
 
 
 def _as_list(value) -> list:
@@ -161,43 +208,53 @@ def sitemap_urls(xml: str) -> tuple[list[str], list[str]]:
     return children, pages
 
 
-class SitemapBoard(Source):
-    """A job board whose sitemap lists every live posting and whose posting pages carry
-    schema.org JobPosting markup."""
+def search_terms(searches: list[dict]) -> list[list[str]]:
+    """Words of each saved search, matched against posting URL slugs on big boards."""
+    terms = []
+    for search in searches:
+        words = [w for w in re.findall(r"[a-z0-9+#]+", (search.get("query") or "").lower())]
+        words = [w for w in words if len(w) >= 3]
+        if words:
+            terms.append(words)
+    return terms
+
+
+def matches_search(url: str, terms: list[list[str]]) -> bool:
+    slug = urlparse(url).path.lower()
+    return any(all(word in slug for word in words) for words in terms)
+
+
+class BoardCrawler(Source):
+    """Shared page-fetching for boards whose posting pages carry JobPosting markup."""
 
     kind = "crawl"
     group = "gentle"
     daily_budget = 150
-    sitemap: str
-    child_filter: str  # substring picking the jobs sitemap from a sitemap index
-    url_filter: re.Pattern | None = None
     country = "NP"
     PAGES_PER_RUN = 40
+    # Big boards: only fetch postings whose URL matches a saved search.
+    filter_by_searches = False
 
-    async def _xml(self, ctx: FetchContext, url: str) -> str:
-        r = await ctx.http.request("GET", url, cache_ttl_s=1800)
-        body = r.content
-        if url.endswith(".gz") and body[:2] == b"\x1f\x8b":
-            body = gzip.decompress(body)
-        return body.decode("utf-8", errors="replace")
-
-    async def fetch(self, ctx: FetchContext) -> FetchResult:
-        children, pages = sitemap_urls(await self._xml(ctx, self.sitemap))
-        for child in [c for c in children if self.child_filter in c]:
-            _, more = sitemap_urls(await self._xml(ctx, child))
-            pages += more
-        if self.url_filter:
-            pages = [p for p in pages if self.url_filter.search(p)]
-        listed = set(pages)
-        known = {
+    def known_urls(self, ctx: FetchContext) -> set[str]:
+        return {
             r["url"]
             for r in ctx.conn.execute(
                 "SELECT url FROM job_sources WHERE source = ? AND status = 'listed'", (self.name,)
             )
         }
-        result = FetchResult(complete_scopes={self.name})
-        result.still_listed = {u for u in listed if u in known}
-        for url in [p for p in pages if p not in known][: ctx.limit or self.PAGES_PER_RUN]:
+
+    def pick(self, ctx: FetchContext, pages: list[str], known: set[str]) -> list[str]:
+        fresh = [p for p in pages if p not in known]
+        if self.filter_by_searches:
+            terms = search_terms(ctx.searches)
+            fresh = [p for p in fresh if matches_search(p, terms)] if terms else []
+        return fresh[: ctx.limit or self.PAGES_PER_RUN]
+
+    async def read_pages(self, ctx: FetchContext, urls: list[str], result: FetchResult) -> None:
+        for url in urls:
+            if not await ctx.http.allowed(url):
+                result.errors.append(f"robots.txt disallows {url}")
+                continue
             try:
                 html = await ctx.http.get_text(url, cache_ttl_s=24 * 3600)
             except NotFound:
@@ -213,6 +270,59 @@ class SitemapBoard(Source):
                 job.source_job_id = url
                 job.url = url
                 result.jobs.append(job)
+
+
+class SitemapBoard(BoardCrawler):
+    """A board whose sitemap lists its live postings."""
+
+    sitemap: str
+    child_filter: str  # regex picking the jobs sitemaps from a sitemap index
+    url_filter: re.Pattern | None = None
+    max_children: int | None = None  # big boards: read only this many child sitemaps
+
+    async def _xml(self, ctx: FetchContext, url: str) -> str:
+        r = await ctx.http.request("GET", url, cache_ttl_s=6 * 3600)
+        body = r.content
+        if body[:2] == b"\x1f\x8b":
+            body = gzip.decompress(body)
+        return body.decode("utf-8", errors="replace")
+
+    async def fetch(self, ctx: FetchContext) -> FetchResult:
+        children, pages = sitemap_urls(await self._xml(ctx, self.sitemap))
+        wanted = [c for c in children if re.search(self.child_filter, c)]
+        complete = self.max_children is None or len(wanted) <= self.max_children
+        for child in wanted[: self.max_children]:
+            _, more = sitemap_urls(await self._xml(ctx, child))
+            pages += more
+        if self.url_filter:
+            pages = [p for p in pages if self.url_filter.search(p)]
+        known = self.known_urls(ctx)
+        # Only a full listing can show that a posting was removed.
+        result = FetchResult(complete_scopes={self.name} if complete else set())
+        result.still_listed = {u for u in pages if u in known}
+        await self.read_pages(ctx, self.pick(ctx, pages, known), result)
+        result.requests = ctx.http.requests
+        return result
+
+
+class ListingBoard(BoardCrawler):
+    """A board with no jobs sitemap: posting links are read from its listing pages."""
+
+    listing_pages: list[str]
+    link_pattern: re.Pattern
+
+    async def fetch(self, ctx: FetchContext) -> FetchResult:
+        pages: list[str] = []
+        for listing in self.listing_pages:
+            html = await ctx.http.get_text(listing, cache_ttl_s=1800)
+            for href in re.findall(r'href="([^"#]+)"', html):
+                full = urljoin(listing, href)
+                if self.link_pattern.search(full) and full not in pages:
+                    pages.append(full)
+        known = self.known_urls(ctx)
+        result = FetchResult()  # listing pages show only the newest postings
+        result.still_listed = {u for u in pages if u in known}
+        await self.read_pages(ctx, self.pick(ctx, pages, known), result)
         result.requests = ctx.http.requests
         return result
 
@@ -231,6 +341,53 @@ class Kumarijob(SitemapBoard):
     via = "Sitemap + JobPosting"
     sitemap = "https://www.kumarijob.com/sitemap.xml"
     child_filter = "sitemap-jobs"
+
+
+class JobsNepal(SitemapBoard):
+    name = "jobsnepal"
+    label = "JobsNepal"
+    via = "Sitemap + microdata"
+    sitemap = "https://www.jobsnepal.com/sitemap.xml"
+    child_filter = "jobs-sitemap"
+
+
+class Jobejee(ListingBoard):
+    name = "jobejee"
+    label = "Jobejee"
+    via = "Listing + JobPosting"
+    listing_pages = ["https://jobejee.com/"]
+    link_pattern = re.compile(r"jobejee\.com/job/[^/]+/\d+$")
+
+
+class Internshala(SitemapBoard):
+    name = "internshala"
+    label = "Internshala"
+    via = "Sitemap + JobPosting"
+    sitemap = "https://internshala.com/sitemap.xml"
+    child_filter = r"/sitemap-(internships|jobs)\.xml$"
+    country = "IN"
+    filter_by_searches = True
+
+
+class Shine(SitemapBoard):
+    name = "shine"
+    label = "Shine"
+    via = "Sitemap + JobPosting"
+    sitemap = "https://www.shine.com/index-all-sitemap.xml"
+    child_filter = r"/all_jd_\d*_?sitemap\.xml$"
+    max_children = 4  # about 10,000 postings each; the rest expire by validThrough
+    country = "IN"
+    filter_by_searches = True
+
+
+class Freshersworld(SitemapBoard):
+    name = "freshersworld"
+    label = "Freshersworld"
+    via = "Sitemap + JobPosting"
+    sitemap = "https://www.freshersworld.com/sitemap-index.xml"
+    child_filter = r"sitemap-activejobs-\d+\.xml$"
+    country = "IN"
+    filter_by_searches = True
 
 
 JOB_LINK = re.compile(r"/(jobs?|careers?|positions?|vacanc|openings?|vacatures?|stellen)", re.I)
@@ -255,6 +412,9 @@ class CompanySites(Source):
             url = company["careers_url"]
             if not url:
                 continue
+            if not await ctx.http.allowed(url):
+                result.errors.append(f"robots.txt disallows {url}")
+                continue
             try:
                 html = await ctx.http.get_text(url, cache_ttl_s=6 * 3600)
             except NotFound:
@@ -269,6 +429,8 @@ class CompanySites(Source):
                     if urlparse(full).netloc == host and JOB_LINK.search(full) and full != url:
                         links.append(full)
                 for link in list(dict.fromkeys(links))[: self.LINKS_PER_SITE]:
+                    if not await ctx.http.allowed(link):
+                        continue
                     try:
                         page = await ctx.http.get_text(link, cache_ttl_s=24 * 3600)
                     except NotFound:
@@ -284,4 +446,6 @@ class CompanySites(Source):
         return result
 
 
-CRAWL_SOURCES = [Merojob, Kumarijob, CompanySites]
+CRAWL_SOURCES = [
+    Merojob, Kumarijob, JobsNepal, Jobejee, Internshala, Shine, Freshersworld, CompanySites,
+]  # fmt: skip

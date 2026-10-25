@@ -300,3 +300,96 @@ def test_board_urls():
         "acme|wd5|External",
     )
     assert board_from_url("https://example.com/careers") is None
+
+
+JOBSNEPAL_PAGE = """<html><body>
+<div itemscope itemtype="http://schema.org/JobPosting">
+  <h1 itemprop="title">Data   Officer</h1>
+  <meta itemprop="datePosted" content="2026-10-16"/>
+  <meta itemprop="validThrough" content="2099-10-27 11:59 p.m."/>
+  <div itemprop="hiringOrganization" itemscope itemtype="http://schema.org/Organization">
+    <span itemprop="name">People in  Need</span>
+    <span itemprop="description">An NGO.</span>
+  </div>
+  <span itemprop="employmentType">Contract</span>
+  <span itemprop="description"><p>Manage project data in Rasuwa and report to the PM.</p></span>
+  <div itemprop="jobLocation" itemscope itemtype="http://schema.org/Place">
+    <div itemprop="address" itemscope itemtype="http://schema.org/PostalAddress">
+      <span itemprop="addressLocality">Kathmandu</span>
+      <meta itemprop="addressCountry" content="NP"/>
+    </div>
+  </div>
+</div></body></html>"""
+
+
+def test_microdata_posting():
+    posting = crawl.job_postings(JOBSNEPAL_PAGE)[0]
+    job = crawl.raw_from_posting(posting, "https://www.jobsnepal.com/x", "jobsnepal")
+    assert (job.title, job.company, job.locations) == (
+        "Data Officer",
+        "People in Need",
+        ["Kathmandu, NP"],
+    )
+    assert "Manage project data" in job.description and "An NGO" not in job.description
+    assert job.valid_through.year == 2099 and job.valid_through.hour == 23
+    assert job.job_type_raw == "Contract"
+
+
+def sitemap(*urls: str) -> str:
+    locs = "".join(f"<url><loc>{u}</loc></url>" for u in urls)
+    return f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{locs}</urlset>'
+
+
+def test_big_board_fetches_only_postings_matching_saved_searches(tmp_path):
+    conn = init_db(tmp_path / "jm.db")
+    with conn:
+        conn.execute(
+            "INSERT INTO saved_searches (name, filters) VALUES "
+            '(\'x\', \'{"query": "Python developer", "location": "Pune"}\')'
+        )
+    index = (
+        '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        "<sitemap><loc>https://www.freshersworld.com/sitemap-activejobs-1.xml</loc></sitemap>"
+        "</sitemapindex>"
+    )
+    py = "https://www.freshersworld.com/jobs/python-developer-jobs-opening-at-pune-1"
+    other = "https://www.freshersworld.com/jobs/accountant-jobs-opening-at-pune-2"
+    page = MEROJOB_PAGE.replace("Leapfrog", "Acme")
+    routes = {
+        "https://www.freshersworld.com/robots.txt": httpx.Response(
+            200, text="User-agent: *\nDisallow: /admin/"
+        ),
+        "https://www.freshersworld.com/sitemap-index.xml": httpx.Response(200, text=index),
+        "https://www.freshersworld.com/sitemap-activejobs-1.xml": httpx.Response(
+            200, text=sitemap(py, other)
+        ),
+        py: httpx.Response(200, text=page),
+    }
+    result, calls = run(conn, "freshersworld", routes)
+    assert result["found"] == 1 and other not in calls
+
+
+def test_robots_disallow_is_respected(tmp_path):
+    conn = init_db(tmp_path / "jm.db")
+    job = "https://merojob.com/python-developer-1"
+    routes = {
+        "https://merojob.com/robots.txt": httpx.Response(200, text="User-agent: *\nDisallow: /"),
+        "https://merojob.com/sitemap.xml": httpx.Response(200, text=sitemap(job)),
+        job: httpx.Response(200, text=MEROJOB_PAGE),
+    }
+    result, calls = run(conn, "merojob", routes)
+    assert job not in calls and result["found"] == 0 and "robots.txt" in result["error"]
+
+
+def test_listing_board(tmp_path):
+    conn = init_db(tmp_path / "jm.db")
+    home = '<a href="/job/Graphic-Designer/48536">x</a><a href="/about">y</a>'
+    job = "https://jobejee.com/job/Graphic-Designer/48536"
+    routes = {
+        "https://jobejee.com/robots.txt": httpx.Response(200, text="User-agent: *\nAllow: /"),
+        "https://jobejee.com/job/": httpx.Response(200, text=MEROJOB_PAGE),
+        "https://jobejee.com/": httpx.Response(200, text=home),
+    }
+    result, calls = run(conn, "jobejee", routes)
+    assert result["found"] == 1 and job in calls
+    assert not any(c.endswith("/about") for c in calls)

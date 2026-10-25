@@ -1,6 +1,7 @@
 """Company job boards with public endpoints. One board = one complete listing (scope), so
 a job missing from its board on two runs in a row expires."""
 
+import re
 import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
 
@@ -16,10 +17,14 @@ def _dt(value) -> datetime | None:
         return None
     if isinstance(value, int | float):
         return datetime.fromtimestamp(value / 1000 if value > 1e11 else value, tz=UTC)
+    text = str(value).strip()
     try:
-        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00").replace(" UTC", "+00:00"))
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00").replace(" UTC", "+00:00"))
     except ValueError:
-        return None
+        # "2026-10-27 11:59 p.m." and similar: the date part is still reliable.
+        if not re.match(r"\d{4}-\d{2}-\d{2}", text):
+            return None
+        dt = datetime.fromisoformat(text[:10])
     return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
