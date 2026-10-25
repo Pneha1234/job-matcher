@@ -191,3 +191,26 @@ def test_api_keys_are_set_from_settings_and_shown_on_sources(client):
     assert not client.put("/settings/keys", json={"source": "jooble", "value": ""}).json()[
         "has_key"
     ]
+
+
+def test_notifications_and_digest(client, db):
+    job = add_job(db, 1)
+    save_profile(db)
+    wait_task(client, client.post("/scoring/run").json()["task_id"])
+    pct = client.get("/jobs").json()["items"][0]["match"]["pct"]
+    s = client.get("/settings").json()["settings"]
+    s["notify_threshold"] = int(pct)
+    client.put("/settings", json=s)
+    found = client.get("/notifications", params={"since": "2000-01-01T00:00:00Z"}).json()
+    assert [n["id"] for n in found] == [job]
+    assert client.get("/notifications", params={"since": "2999-01-01T00:00:00Z"}).json() == []
+    digest = client.get("/digest").json()
+    assert digest["new_jobs"] == 1 and digest["top_matches"][0]["id"] == job
+    md = client.get("/digest.md").text
+    assert md.startswith("# Job Matcher digest for today") and "Python Developer 1" in md
+    # Applying takes a job out of "new matches"; turning notifications off silences them.
+    client.put(f"/jobs/{job}/application", json={"status": "applied"})
+    assert client.get("/digest").json()["top_matches"] == []
+    s["notify"] = False
+    client.put("/settings", json=s)
+    assert client.get("/notifications", params={"since": "2000-01-01T00:00:00Z"}).json() == []

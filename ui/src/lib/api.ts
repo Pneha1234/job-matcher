@@ -233,6 +233,15 @@ export type Insights = {
   best_sources: { source: string; jobs: number }[];
 };
 
+export type Digest = {
+  days: number;
+  threshold: number;
+  new_jobs: number;
+  top_matches: { id: number; title: string; company: string; pct: number }[];
+  follow_ups: { id: number; job_id: number; title: string; company: string; days: number }[];
+  expired_tracked: { title: string; company: string; reason: string | null }[];
+};
+
 export class ApiError extends Error {
   status: number;
   fields: Record<string, string>;

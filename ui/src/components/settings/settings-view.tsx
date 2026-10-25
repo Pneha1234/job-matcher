@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { Btn, Card, Check, Chip, Field } from "@/components/bits";
 import { PreferencesForm, useSettings } from "@/components/profile/preferences";
@@ -218,6 +218,63 @@ function ScheduleCard({ data }: { data: SettingsResponse }) {
   );
 }
 
+function NotificationsCard({ data }: { data: SettingsResponse }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [s, setS] = useState<AppSettings>(data.settings);
+  // The browser's permission isn't known during prerender; read it on the client only.
+  const browserPermission = useSyncExternalStore(
+    () => () => {},
+    () => (typeof Notification === "undefined" ? "unsupported" : Notification.permission),
+    () => "default",
+  );
+  const [asked, setAsked] = useState<string | null>(null);
+  const permission = asked ?? browserPermission;
+  const setPermission = setAsked;
+  const save = useMutation({
+    mutationFn: () => apiSend("/settings", "PUT", s),
+    onSuccess: () => (qc.invalidateQueries({ queryKey: ["settings"] }), toast("Saved")),
+  });
+  return (
+    <Card>
+      <b>Notifications</b>
+      <div className="mb-2 text-xs text-muted-foreground">
+        A desktop notification when a newly scored job reaches your threshold, while Job Matcher is open in a browser tab.
+      </div>
+      <Check checked={s.notify} onChange={(v) => setS({ ...s, notify: v })}>
+        Notify me about new strong matches
+      </Check>
+      <div className="my-2 grid grid-cols-[1fr_44px] items-center gap-2.5">
+        <input
+          type="range"
+          min={50}
+          max={100}
+          step={5}
+          value={s.notify_threshold}
+          aria-label="Notification threshold"
+          onChange={(e) => setS({ ...s, notify_threshold: Number(e.target.value) })}
+        />
+        <b className="text-right">{s.notify_threshold}%</b>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {permission === "granted" ? (
+          <Chip tone="ok">Browser notifications allowed</Chip>
+        ) : permission === "unsupported" ? (
+          <Chip>This browser can&apos;t show notifications</Chip>
+        ) : permission === "denied" ? (
+          <Chip tone="warn">Blocked: allow notifications for this site in your browser</Chip>
+        ) : (
+          <Btn onClick={async () => setPermission(await Notification.requestPermission())}>Allow desktop notifications</Btn>
+        )}
+        <div className="flex-1" />
+        <Btn variant="primary" disabled={save.isPending} onClick={() => save.mutate()}>
+          Save
+        </Btn>
+      </div>
+    </Card>
+  );
+}
+
 function KeysCard() {
   const qc = useQueryClient();
   const toast = useToast();
@@ -320,6 +377,7 @@ export function SettingsView() {
           <SearchesCard />
           <PreferencesForm />
           <ScheduleCard data={data} />
+          <NotificationsCard data={data} />
           <KeysCard />
           <DataCard data={data} />
         </div>

@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { NotificationWatcher } from "@/components/notifications";
 import { ToastProvider } from "@/components/toast";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -11,7 +12,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
   return (
     <QueryClientProvider client={client}>
-      <ToastProvider>{children}</ToastProvider>
+      <ToastProvider>
+        <NotificationWatcher />
+        {children}
+      </ToastProvider>
     </QueryClientProvider>
   );
 }

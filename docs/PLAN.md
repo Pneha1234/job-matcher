@@ -250,7 +250,7 @@ own profile, a week of daily use, three unattended days) are not claimed here.
 | 6 | Built | Two missed complete listings → expired with reason; deadlines; 45-day stale; daily URL checks of scraped jobs; re-listing reactivates |
 | 7 | Built | Jobs (filters, views, search, sort, cards, drawer, undo, keyboard, new-jobs banner, manual import), Applications (board, table, CSV, follow-up, notes), Sources, Settings, Profile |
 | 8 | Built, not soak-tested | APScheduler tick every 10 min runs due source groups, daily lifecycle and FX; Sources page shows health, 7-run sparkline and budget |
-| 9 | Partly built | Insights page and cover-letter drafts are built. Map view, digest, gap analysis beyond Insights, feedback-tuned weights, notifications and Tauri are not |
+| 9 | Partly built | Insights, cover-letter drafts, a daily digest (in Insights and as Markdown) and desktop notifications for new strong matches are built. Map view, gap analysis beyond Insights, feedback-tuned weights and Tauri are not |
 
 ### Not built yet
 
@@ -265,7 +265,6 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   a private API behind bot detection), TimesJobs (broken TLS certificate chain; we don't
   turn off certificate checks).
 - Location UI: map view, radius search, timezone overlap.
-- Notifications for new 85%+ matches (the setting is stored, nothing sends yet).
 
 ## Edge cases to keep covered
 
@@ -365,3 +364,8 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   similarity alone is never enough; region variants stay separate jobs because their
   eligibility differs. The later job gets `duplicate_of` and its sources and locations
   move to the earlier one; jobs you track or hid are never merged away.
+- 2026-10-26 — Notifications are browser desktop notifications while the app is open in
+  a tab (no background service, no external push). They cover newly scored jobs at or
+  above the threshold that you haven't hidden or tracked yet. Clicking one opens the
+  job's drawer via `/jobs?job=ID`. The digest is a card on Insights and a Markdown file
+  you can save; nothing is emailed.

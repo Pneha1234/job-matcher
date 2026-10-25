@@ -4,8 +4,74 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 
 import { Bar, Card, Empty } from "@/components/bits";
-import { apiGet, type Insights } from "@/lib/api";
+import { useState } from "react";
+
+import { apiGet, type Digest, type Insights } from "@/lib/api";
 import { money, sourceLabel } from "@/lib/format";
+
+function DigestCard() {
+  const [days, setDays] = useState(1);
+  const { data } = useQuery({ queryKey: ["digest", days], queryFn: () => apiGet<Digest>(`/digest?days=${days}`) });
+  return (
+    <Card className="mb-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <b>Digest</b>
+        <div className="flex-1" />
+        <select aria-label="Digest period" value={days} onChange={(e) => setDays(Number(e.target.value))}>
+          <option value={1}>Today</option>
+          <option value={7}>Last 7 days</option>
+        </select>
+        <a href={`/api/digest.md?days=${days}`} download="job-matcher-digest.md" className="rounded-lg border border-input bg-card px-3 py-1.5 text-sm hover:bg-muted">
+          Save as Markdown
+        </a>
+      </div>
+      {!data ? (
+        <div className="text-xs text-faint">Loading…</div>
+      ) : (
+        <div className="mt-2 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div>
+            <div className="text-xs text-muted-foreground">
+              New matches at {data.threshold}%+ · {data.new_jobs.toLocaleString()} new jobs in all
+            </div>
+            {data.top_matches.length ? (
+              data.top_matches.slice(0, 8).map((m) => (
+                <Link key={m.id} href={`/jobs?job=${m.id}`} className="block truncate py-0.5 text-[13px]">
+                  <b>{Math.round(m.pct)}%</b> {m.title} <span className="text-muted-foreground">· {m.company}</span>
+                </Link>
+              ))
+            ) : (
+              <div className="text-xs text-faint">None yet.</div>
+            )}
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground">Follow up</div>
+            {data.follow_ups.length ? (
+              data.follow_ups.map((f) => (
+                <Link key={f.id} href={`/jobs?job=${f.job_id}`} className="block truncate py-0.5 text-[13px]">
+                  {f.company} <span className="text-muted-foreground">· applied {f.days} days ago</span>
+                </Link>
+              ))
+            ) : (
+              <div className="text-xs text-faint">Nothing due.</div>
+            )}
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground">Tracked postings that closed</div>
+            {data.expired_tracked.length ? (
+              data.expired_tracked.map((e, i) => (
+                <div key={i} className="truncate py-0.5 text-[13px]" title={e.reason ?? undefined}>
+                  {e.company} <span className="text-muted-foreground">· {e.title}</span>
+                </div>
+              ))
+            ) : (
+              <div className="text-xs text-faint">None.</div>
+            )}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
 
 export function InsightsView() {
   const { data } = useQuery({ queryKey: ["insights"], queryFn: () => apiGet<Insights>("/insights") });
@@ -36,6 +102,7 @@ export function InsightsView() {
           </Link>
         </Empty>
       )}
+      {data.has_profile && <DigestCard />}
       <div className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
         {stats.map(([label, value]) => (
           <Card key={label} className="p-3.5">

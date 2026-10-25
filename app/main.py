@@ -8,7 +8,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import scheduler
-from app.api import applications, health, insights, jobs, profile, settings, sources, tasks
+from app.api import (
+    applications,
+    digest,
+    health,
+    insights,
+    jobs,
+    profile,
+    settings,
+    sources,
+    tasks,
+)
 from app.config import get_settings
 from app.db import init_db
 from app.llm import OllamaClient
@@ -48,5 +58,5 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-for module in (health, profile, jobs, applications, sources, settings, insights, tasks):
+for module in (health, profile, jobs, applications, sources, settings, insights, tasks, digest):
     app.include_router(module.router)

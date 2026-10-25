@@ -2,8 +2,8 @@
 
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
 import { Btn, Card, Check, Chip, Drawer, Empty, FilterGroup, Kbd } from "@/components/bits";
 import { useJobActions } from "@/components/jobs/actions";
@@ -77,6 +77,16 @@ const PAGE = 50;
 const SHORTCUTS = ["EU", "DACH", "Nordics", "UK & Ireland", "North America", "GCC", "APAC",
   "India metros", "Kathmandu Valley", "South Asia"];
 
+/** Opens the drawer for /jobs?job=ID (links from notifications and the digest). */
+function JobLinkOpener({ onOpen }: { onOpen: (id: number) => void }) {
+  const params = useSearchParams();
+  const id = Number(params.get("job"));
+  useEffect(() => {
+    if (id) onOpen(id);
+  }, [id, onOpen]);
+  return null;
+}
+
 export function JobsView() {
   const router = useRouter();
   const qc = useQueryClient();
@@ -132,6 +142,10 @@ export function JobsView() {
   });
 
   const { save, apply, hide } = useJobActions();
+  const openJob = useCallback((id: number) => {
+    setSelected(id);
+    setDrawer(true);
+  }, []);
   const startScoring = useCallback(async () => {
     await apiSend("/scoring/run", "POST");
     qc.invalidateQueries({ queryKey: ["summary"] });
@@ -400,6 +414,9 @@ export function JobsView() {
         </div>
       </div>
 
+      <Suspense fallback={null}>
+        <JobLinkOpener onOpen={openJob} />
+      </Suspense>
       <Drawer open={drawer && selected !== null} onClose={() => setDrawer(false)} label="Job details">
         {selected !== null && <JobDrawerBody jobId={selected} weights={settings?.weights} currency={currency} onClose={() => setDrawer(false)} />}
       </Drawer>
