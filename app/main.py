@@ -1,25 +1,41 @@
 """FastAPI entry point: ``uvicorn app.main:app``."""
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health
+from app import scheduler
+from app.api import applications, health, insights, jobs, profile, settings, sources, tasks
 from app.config import get_settings
 from app.db import init_db
 from app.llm import OllamaClient
+from app.matching.service import start_rescore
+from app.seeds import seed
+from app.tasks import TaskRunner
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    settings = get_settings()
-    app.state.db = init_db(settings.db_path)
+    cfg = get_settings()
+    app.state.db = init_db(cfg.db_path)
     app.state.ollama = OllamaClient()
+    app.state.tasks = TaskRunner(app.state.db)
+    seed(app.state.db)
+    sched = None
+    if cfg.scheduler:
+        asyncio.create_task(scheduler.first_run_setup(app.state.db))
+        sched = scheduler.start(app.state.db, app.state.ollama, app.state.tasks)
+        # Pick up scoring a restart interrupted; it skips jobs already scored.
+        start_rescore(app.state.db, app.state.ollama, app.state.tasks)
     try:
         yield
     finally:
+        if sched:
+            sched.shutdown(wait=False)
+        await app.state.tasks.shutdown()
         await app.state.ollama.aclose()
         app.state.db.close()
 
@@ -32,4 +48,5 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.include_router(health.router)
+for module in (health, profile, jobs, applications, sources, settings, insights, tasks):
+    app.include_router(module.router)
