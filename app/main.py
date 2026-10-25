@@ -23,6 +23,7 @@ from app.config import get_settings
 from app.db import init_db
 from app.llm import OllamaClient
 from app.matching.service import start_rescore
+from app.normalize.ingest import backfill_timezones
 from app.seeds import seed
 from app.tasks import TaskRunner
 
@@ -37,6 +38,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     sched = None
     if cfg.scheduler:
         asyncio.create_task(scheduler.first_run_setup(app.state.db))
+        backfill_timezones(app.state.db)
         sched = scheduler.start(app.state.db, app.state.ollama, app.state.tasks)
         # Pick up scoring a restart interrupted; it skips jobs already scored.
         start_rescore(app.state.db, app.state.ollama, app.state.tasks)

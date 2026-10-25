@@ -250,6 +250,12 @@ MIGRATIONS: list[str] = [
     ALTER TABLE jobs ADD COLUMN duplicate_of INTEGER REFERENCES jobs (id);
     CREATE INDEX jobs_duplicate_of ON jobs (duplicate_of);
     """,
+    # 4 — time zones for the overlap filter
+    """
+    ALTER TABLE job_locations ADD COLUMN timezone TEXT;
+    ALTER TABLE job_locations ADD COLUMN utc_offset_min INTEGER;
+    CREATE INDEX job_locations_latlon ON job_locations (lat, lon);
+    """,
 ]
 
 

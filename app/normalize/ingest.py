@@ -6,7 +6,7 @@ import sqlite3
 from dataclasses import dataclass
 
 from app.normalize import classify, fx
-from app.normalize.geo import Geo, Resolution, load_geo
+from app.normalize.geo import Geo, Resolution, load_geo, utc_offset_minutes
 from app.normalize.salary import Salary, from_parts, parse_salary
 from app.settings_store import AppSettings
 from app.sources.base import RawJob
@@ -237,7 +237,8 @@ def upsert(conn: sqlite3.Connection, raw: RawJob, norm: Normalised) -> tuple[int
         known.add(loc.raw)
         conn.execute(
             "INSERT INTO job_locations (job_id, raw, city, region, country_code, lat, lon, "
-            "geonames_id, resolved) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "geonames_id, resolved, timezone, utc_offset_min) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 job_id,
                 loc.raw,
@@ -248,6 +249,28 @@ def upsert(conn: sqlite3.Connection, raw: RawJob, norm: Normalised) -> tuple[int
                 loc.lon,
                 loc.geonames_id,
                 int(loc.resolved),
+                loc.timezone,
+                utc_offset_minutes(loc.timezone),
             ),
         )
     return job_id, created
+
+
+def backfill_timezones(conn: sqlite3.Connection, geo: Geo | None = None) -> int:
+    """Give locations stored before time zones were tracked their zone and offset."""
+    geo = geo if geo is not None else load_geo()
+    if geo is None:
+        return 0
+    rows = conn.execute(
+        "SELECT id, geonames_id FROM job_locations WHERE geonames_id IS NOT NULL "
+        "AND timezone IS NULL"
+    ).fetchall()
+    with conn:
+        for r in rows:
+            city = geo.by_id.get(r["geonames_id"])
+            if city and city.timezone:
+                conn.execute(
+                    "UPDATE job_locations SET timezone = ?, utc_offset_min = ? WHERE id = ?",
+                    (city.timezone, utc_offset_minutes(city.timezone), r["id"]),
+                )
+    return len(rows)

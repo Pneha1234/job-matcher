@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 from pydantic import BaseModel, Field
 
+from app.normalize.geo import load_geo, utc_offset_minutes
 from app.normalize.regions import CITY_GROUPS, REGIONS
 from app.settings_store import AppSettings
 from app.util import iso, loads
@@ -21,6 +22,10 @@ class JobFilters(BaseModel):
     regions: list[str] = []
     cities: list[str] = []  # city-group names such as "Kathmandu Valley"
     remote_eligible: bool = False  # include remote jobs open to the user's home country
+    near_lat: float | None = Field(None, ge=-90, le=90)  # "near a city" radius search
+    near_lon: float | None = Field(None, ge=-180, le=180)
+    radius_km: int = Field(50, ge=1, le=2000)
+    tz_overlap: int = Field(0, ge=0, le=8)  # hours of 9-to-5 overlap with your time zone
     location_unclear: bool = True
     salary_only: bool = False
     salary_min: int | None = None
@@ -50,6 +55,24 @@ LEFT JOIN user_job_flags f ON f.job_id = j.id
 def _today_start() -> str:
     now = datetime.now(UTC)
     return iso(now.replace(hour=0, minute=0, second=0, microsecond=0))  # type: ignore[return-value]
+
+
+def home_offset(settings: AppSettings) -> int | None:
+    """UTC offset of where you live: your city if set, else your country's largest city."""
+    geo = load_geo()
+    if geo is None or not settings.home_country:
+        return None
+    candidates = []
+    if settings.home_city:
+        candidates = [c for c in geo.search(settings.home_city, 20)
+                      if c.country == settings.home_country]  # fmt: skip
+    if not candidates:
+        candidates = sorted(
+            (c for c in geo.by_id.values() if c.country == settings.home_country),
+            key=lambda c: c.population,
+            reverse=True,
+        )
+    return utc_offset_minutes(candidates[0].timezone) if candidates else None
 
 
 def where_clause(flt: JobFilters, settings: AppSettings) -> tuple[str, dict]:
@@ -113,6 +136,14 @@ def where_clause(flt: JobFilters, settings: AppSettings) -> tuple[str, dict]:
             f"OR EXISTS (SELECT 1 FROM json_each(j.remote_eligibility, '$.regions') "
             f"WHERE value IN ({region_marks}))))"
         )
+    if flt.near_lat is not None and flt.near_lon is not None:
+        args.update(nlat=flt.near_lat, nlon=flt.near_lon, rkm=flt.radius_km)
+        place_conds.append(
+            "EXISTS (SELECT 1 FROM job_locations l WHERE l.job_id = j.id AND l.lat IS NOT NULL "
+            "AND 6371 * acos(min(1, cos(radians(:nlat)) * cos(radians(l.lat)) * "
+            "cos(radians(l.lon) - radians(:nlon)) + sin(radians(:nlat)) * sin(radians(l.lat))))"
+            " <= :rkm)"
+        )
     if place_conds and flt.location_unclear:
         place_conds.append(
             "NOT EXISTS (SELECT 1 FROM job_locations l WHERE l.job_id = j.id "
@@ -121,6 +152,20 @@ def where_clause(flt: JobFilters, settings: AppSettings) -> tuple[str, dict]:
         )
     if place_conds:
         clauses.append("(" + " OR ".join(place_conds) + ")")
+    home = home_offset(settings) if flt.tz_overlap else None
+    if home is not None:
+        # Overlap of two 9-to-5 days, in minutes, from the difference in UTC offsets.
+        args.update(home_off=home, tz_need=flt.tz_overlap * 60)
+        tz_cond = (
+            "EXISTS (SELECT 1 FROM job_locations l WHERE l.job_id = j.id AND "
+            "l.utc_offset_min IS NOT NULL AND 480 - abs(l.utc_offset_min - :home_off) >= :tz_need)"
+        )
+        if flt.location_unclear:
+            tz_cond = (
+                f"({tz_cond} OR NOT EXISTS (SELECT 1 FROM job_locations l WHERE l.job_id = j.id "
+                "AND l.utc_offset_min IS NOT NULL))"
+            )
+        clauses.append(tz_cond)
     if flt.salary_only:
         clauses.append("j.salary_text IS NOT NULL")
     if flt.salary_min:
@@ -240,3 +285,33 @@ def card(r: sqlite3.Row, locations: list[dict], sources: list[dict], active: int
         ),
         "hidden": bool(r["hidden"]),
     }
+
+
+def job_map(conn: sqlite3.Connection, flt: JobFilters, settings: AppSettings, active: int | None):
+    """Matching jobs grouped by city for the map: one point per place, best matches first."""
+    where, args = where_clause(flt, settings)
+    args["active"] = active or -1
+    rows = conn.execute(
+        f"SELECT l.city, l.country_code, l.lat, l.lon, j.id, j.title, j.company_name, "
+        f"ms.final_pct FROM jobs j {SCORE_JOIN} JOIN job_locations l ON l.job_id = j.id "
+        f"WHERE {where} AND l.lat IS NOT NULL AND l.city IS NOT NULL "
+        f"ORDER BY ms.final_pct IS NULL, ms.final_pct DESC LIMIT 20000",
+        args,
+    ).fetchall()
+    points: dict[tuple, dict] = {}
+    for r in rows:
+        key = (r["city"], r["country_code"])
+        point = points.setdefault(
+            key,
+            {"city": r["city"], "country": r["country_code"], "lat": r["lat"],
+             "lon": r["lon"], "count": 0, "best": None, "jobs": []},  # fmt: skip
+        )
+        point["count"] += 1
+        if r["final_pct"] is not None and (point["best"] is None or r["final_pct"] > point["best"]):
+            point["best"] = r["final_pct"]
+        if len(point["jobs"]) < 5:
+            point["jobs"].append(
+                {"id": r["id"], "title": r["title"], "company": r["company_name"],
+                 "pct": r["final_pct"]}  # fmt: skip
+            )
+    return sorted(points.values(), key=lambda p: -p["count"])

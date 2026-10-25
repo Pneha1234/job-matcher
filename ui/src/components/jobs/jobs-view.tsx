@@ -2,6 +2,7 @@
 
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
@@ -10,6 +11,8 @@ import { useJobActions } from "@/components/jobs/actions";
 import { ImportPanel } from "@/components/jobs/import-dialog";
 import { JobCard } from "@/components/jobs/job-card";
 import { JobDrawerBody } from "@/components/jobs/job-drawer";
+import type { MapPoint } from "@/components/jobs/job-map";
+import { NearPicker, type Near } from "@/components/jobs/near-picker";
 import { CountryPicker, useSettings } from "@/components/profile/preferences";
 import { apiGet, apiSend, toQuery, useTask, type JobCard as Job, type JobList, type Summary } from "@/lib/api";
 import { JOB_TYPE_LABEL } from "@/lib/format";
@@ -33,6 +36,9 @@ type Filters = {
   show_hidden: boolean;
   visa: boolean;
   relocation: boolean;
+  near: Near;
+  radius_km: number;
+  tz_overlap: number;
   sort: string;
 };
 
@@ -54,6 +60,9 @@ const DEFAULTS: Filters = {
   show_hidden: false,
   visa: false,
   relocation: false,
+  near: null,
+  radius_km: 50,
+  tz_overlap: 0,
   sort: "match",
 };
 
@@ -76,6 +85,12 @@ const PAGE = 50;
 // The region shortcuts from docs/PLAN.md; any country is still one pick away below them.
 const SHORTCUTS = ["EU", "DACH", "Nordics", "UK & Ireland", "North America", "GCC", "APAC",
   "India metros", "Kathmandu Valley", "South Asia"];
+
+// Leaflet touches window on import, so the map loads in the browser only.
+const JobMap = dynamic(() => import("@/components/jobs/job-map"), {
+  ssr: false,
+  loading: () => <div className="h-[640px] animate-pulse rounded-xl bg-muted" />,
+});
 
 /** Opens the drawer for /jobs?job=ID (links from notifications and the digest). */
 function JobLinkOpener({ onOpen }: { onOpen: (id: number) => void }) {
@@ -119,8 +134,16 @@ export function JobsView() {
 
   const params = useMemo(() => {
     const preset = VIEWS.find((v) => v.key === view)?.apply ?? {};
-    return { ...f, ...preset, limit };
+    const { near, ...rest } = { ...f, ...preset };
+    return { ...rest, near_lat: near?.lat, near_lon: near?.lon, limit };
   }, [f, view, limit]);
+  const [mode, setMode] = useState<"list" | "map">("list");
+  const { data: mapPoints } = useQuery({
+    queryKey: ["jobs-map", params],
+    queryFn: () => apiGet<MapPoint[]>(`/jobs/map${toQuery({ ...params, limit: undefined })}`),
+    enabled: mode === "map",
+    placeholderData: keepPreviousData,
+  });
 
   const { data, isFetching, isError } = useQuery({
     queryKey: ["jobs", params],
@@ -282,10 +305,25 @@ export function JobsView() {
               })}
             </div>
             {meta && <CountryPicker countries={meta.countries} value={f.countries} onChange={(v) => set("countries", v)} placeholder="Add a country" />}
+            <NearPicker near={f.near} radius={f.radius_km} onChange={(near, r) => (setF((p) => ({ ...p, near, radius_km: r })), setLimit(PAGE))} />
             <Check checked={f.remote_eligible} onChange={(v) => set("remote_eligible", v)}>
               Remote I&apos;m eligible for
             </Check>
             {f.remote_eligible && !settings?.home_country && (
+              <div className="text-xs text-warn">
+                Set where you live in <Link href="/settings" className="underline">Settings</Link> first.
+              </div>
+            )}
+            <label className="mt-1 flex items-center gap-2 text-[13px]">
+              <span className="flex-1">Time zone overlap</span>
+              <select aria-label="Time zone overlap" className="py-0.5 text-xs" value={f.tz_overlap} onChange={(e) => set("tz_overlap", Number(e.target.value))}>
+                <option value={0}>Any</option>
+                <option value={2}>2h+</option>
+                <option value={4}>4h+</option>
+                <option value={6}>6h+</option>
+              </select>
+            </label>
+            {f.tz_overlap > 0 && !settings?.home_country && (
               <div className="text-xs text-warn">
                 Set where you live in <Link href="/settings" className="underline">Settings</Link> first.
               </div>
@@ -368,6 +406,13 @@ export function JobsView() {
           </div>
           <div className="mb-3 flex flex-wrap items-center gap-2.5">
             <input type="text" value={qText} onChange={(e) => setQText(e.target.value)} placeholder="Search title, company or skill" className="min-w-[180px] flex-1" aria-label="Search" />
+            <div className="flex overflow-hidden rounded-lg border border-input">
+              {(["list", "map"] as const).map((m) => (
+                <button key={m} type="button" onClick={() => setMode(m)} className={cn("px-3 py-1 text-[13px]", mode === m ? "bg-primary text-primary-foreground" : "bg-card")}>
+                  {m === "list" ? "List" : "Map"}
+                </button>
+              ))}
+            </div>
             <select value={f.sort} onChange={(e) => set("sort", e.target.value)} aria-label="Sort">
               <option value="match">Best match</option>
               <option value="new">Newest</option>
@@ -391,7 +436,15 @@ export function JobsView() {
               <Btn onClick={() => (setF((p) => ({ ...p, min_match: 50, posted_days: 30 })), setView("all"))}>Lower min match to 50% and show 30 days</Btn>
             </Empty>
           )}
-          {list.map((job) => (
+          {mode === "map" && (
+            <div className="mb-3">
+              <JobMap points={mapPoints ?? []} onOpen={openJob} />
+              <div className="mt-1 text-xs text-faint">
+                Jobs with a known city. Remote-only and unclear locations stay in the list. Map tiles come from OpenStreetMap.
+              </div>
+            </div>
+          )}
+          {mode === "list" && list.map((job) => (
             <JobCard
               key={job.id}
               job={job}
@@ -403,7 +456,7 @@ export function JobsView() {
               onHide={() => hide(job)}
             />
           ))}
-          {data && data.total > list.length && (
+          {mode === "list" && data && data.total > list.length && (
             <Btn className="w-full" onClick={() => setLimit((l) => l + PAGE)}>
               Show more ({(data.total - list.length).toLocaleString()} left)
             </Btn>

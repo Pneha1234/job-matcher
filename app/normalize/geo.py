@@ -9,8 +9,10 @@ import io
 import re
 import zipfile
 from dataclasses import dataclass, field
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 
@@ -73,6 +75,7 @@ class City:
     lat: float
     lon: float
     population: int
+    timezone: str = ""
 
 
 @dataclass
@@ -85,6 +88,7 @@ class Location:
     lon: float | None = None
     geonames_id: int | None = None
     resolved: bool = False
+    timezone: str | None = None
 
 
 @dataclass
@@ -131,6 +135,7 @@ class Geo:
         self.admin1_keys: dict[tuple[str, str], str] = {}  # (cc, folded name) -> admin code
         self.admin1_names: dict[str, list[tuple[str, str]]] = {}  # folded name -> [(cc, code)]
         self.cities: dict[str, list[City]] = {}
+        self.by_id: dict[int, City] = {}
         self._load(folder)
 
     def _load(self, folder: Path) -> None:
@@ -166,7 +171,9 @@ class Geo:
                 lat=float(cols[4]),
                 lon=float(cols[5]),
                 population=int(cols[14] or 0),
+                timezone=cols[17] if len(cols) > 17 else "",
             )
+            self.by_id[city.geonames_id] = city
             names = {cols[1], cols[2]}
             # Latin-script aliases only; other scripts fold to nothing and are skipped.
             names.update(a for a in cols[3].split(",") if a and len(a) <= 40)
@@ -183,6 +190,19 @@ class Geo:
         if len(text.strip()) == 2 and text.strip().isupper() and text.strip() in self.countries:
             return text.strip()
         return None
+
+    def search(self, text: str, limit: int = 8) -> list[City]:
+        """Cities whose name starts with ``text``, biggest first, for the "near" picker."""
+        prefix = ascii_fold(text)
+        if len(prefix) < 2:
+            return []
+        found = {
+            c.geonames_id: c
+            for key, cities in self.cities.items()
+            if key.startswith(prefix)
+            for c in cities
+        }
+        return sorted(found.values(), key=lambda c: c.population, reverse=True)[:limit]
 
     def country_name(self, code: str | None) -> str | None:
         return self.countries.get(code) if code else None
@@ -310,6 +330,7 @@ class Geo:
             loc.region = self.admin1.get(f"{city.country}.{city.admin1}")
             loc.country_code = city.country
             loc.lat, loc.lon, loc.geonames_id = city.lat, city.lon, city.geonames_id
+            loc.timezone = city.timezone or None
             loc.resolved = True
         elif cc:
             loc.country_code = cc  # the country is certain even if the city is not
@@ -349,6 +370,17 @@ class Geo:
         if top >= DOMINANCE * runner_up or (same_place and top >= 5 * runner_up):
             return unique[0]
         return None
+
+
+def utc_offset_minutes(timezone: str | None) -> int | None:
+    """Current UTC offset of an IANA zone; DST shifts by an hour are tolerable here."""
+    if not timezone:
+        return None
+    try:
+        offset = datetime.now(ZoneInfo(timezone)).utcoffset()
+    except (ZoneInfoNotFoundError, ValueError):
+        return None
+    return int(offset.total_seconds() // 60) if offset is not None else None
 
 
 @lru_cache(maxsize=4)

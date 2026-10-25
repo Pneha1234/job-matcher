@@ -6,9 +6,10 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.api.deps import DbDep, OllamaDep, TasksDep
-from app.jobs_query import JobFilters, list_jobs
+from app.jobs_query import JobFilters, job_map, list_jobs
 from app.llm import LLMError
 from app.matching.service import score_job, start_rescore
+from app.normalize.geo import load_geo
 from app.profile import store
 from app.settings_store import load as load_settings
 from app.sources.manual import ImportError_, import_job
@@ -22,6 +23,24 @@ router = APIRouter(tags=["jobs"])
 async def jobs(db: DbDep, flt: Annotated[JobFilters, Query()]):
     active = store.active(db)
     return list_jobs(db, flt, load_settings(db), active["id"] if active else None)
+
+
+@router.get("/jobs/map")
+async def jobs_map(db: DbDep, flt: Annotated[JobFilters, Query()]):
+    active = store.active(db)
+    return job_map(db, flt, load_settings(db), active["id"] if active else None)
+
+
+@router.get("/geo/cities")
+async def geo_cities(q: str):
+    geo = load_geo()
+    if geo is None:
+        return []
+    return [
+        {"name": c.name, "region": geo.admin1.get(f"{c.country}.{c.admin1}"),
+         "country": c.country, "lat": c.lat, "lon": c.lon}  # fmt: skip
+        for c in geo.search(q)
+    ]
 
 
 @router.get("/jobs/new-count")

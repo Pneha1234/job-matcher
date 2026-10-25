@@ -234,3 +234,49 @@ def test_missing_skills_count_spellings_together(client, db, fake_ollama):
     gaps = client.get("/insights").json()["missing_skills"]
     assert gaps[0]["share"] == 100 and gaps[0]["skill"].lower() == "kubernetes"
     assert len([g for g in gaps if g["skill"].lower() == "kubernetes"]) == 1
+
+
+def test_near_a_city_radius(client, db):
+    ams = add_job(db, 1, locations=["Amsterdam"])
+    utr = add_job(db, 2, locations=["Utrecht"])  # about 35 km away
+    add_job(db, 3, locations=["Rotterdam"])  # about 57 km away
+    add_job(db, 4, locations=["Berlin"])
+    near = {"near_lat": 52.37, "near_lon": 4.89, "location_unclear": False}
+    assert set(ids(client, **near, radius_km=50)) == {ams, utr}
+    assert len(ids(client, **near, radius_km=100)) == 3
+
+
+def test_time_zone_overlap(client, db):
+    s = load(db)
+    s.home_country, s.home_city = "NP", "Kathmandu"
+    save(db, s)
+    pune = add_job(db, 1, locations=["Pune"])  # 15 minutes apart
+    ams = add_job(db, 2, locations=["Amsterdam"])  # 3h45-4h45 apart
+    add_job(db, 3, locations=["New York"])  # about 10 hours apart
+    unclear = add_job(db, 4, locations=["Somewhere"])
+    assert set(ids(client, tz_overlap=2)) == {pune, ams, unclear}
+    assert set(ids(client, tz_overlap=6, location_unclear=False)) == {pune}
+
+
+def test_map_points_and_city_search(client, db):
+    add_job(db, 1, locations=["Amsterdam"])
+    add_job(db, 2, locations=["Amsterdam"], title="Data Engineer")
+    add_job(db, 3, locations=["Somewhere"])
+    points = client.get("/jobs/map").json()
+    assert [(p["city"], p["count"]) for p in points] == [("Amsterdam", 2)]
+    assert len(points[0]["jobs"]) == 2
+    cities = client.get("/geo/cities", params={"q": "amst"}).json()
+    assert cities[0]["name"] == "Amsterdam" and cities[0]["country"] == "NL"
+    assert client.get("/geo/cities", params={"q": "a"}).json() == []
+
+
+def test_backfill_timezones(db):
+    from app.normalize.ingest import backfill_timezones
+
+    job = add_job(db, 1, locations=["Amsterdam"])
+    with db:
+        db.execute("UPDATE job_locations SET timezone = NULL, utc_offset_min = NULL")
+    backfill_timezones(db)
+    row = db.execute("SELECT timezone, utc_offset_min FROM job_locations WHERE job_id = ?",
+                     (job,)).fetchone()  # fmt: skip
+    assert row["timezone"] == "Europe/Amsterdam" and row["utc_offset_min"] in (60, 120)

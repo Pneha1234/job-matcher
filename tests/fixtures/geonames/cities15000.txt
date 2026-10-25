@@ -1,25 +1,25 @@
-2759794	Amsterdam	Amsterdam	Amsterdam,Amsterdama	52.37	4.89	P	PPL	NL		07				741636				
-2747891	Rotterdam	Rotterdam		51.92	4.48	P	PPL	NL		11				598199				
-2745912	Utrecht	Utrecht		52.09	5.12	P	PPL	NL		09				290529				
-2950159	Berlin	Berlin	Berlino	52.52	13.41	P	PPL	DE		16				3426354				
-2867714	Munich	Munich	Muenchen,München	48.14	11.58	P	PPL	DE		02				1260391				
-2643743	London	London	Londres	51.51	-0.13	P	PPL	GB		ENG				8961989				
-6058560	London	London		42.98	-81.23	P	PPL	CA		08				346765				
-1283240	Kathmandu	Kathmandu	Kathmandu,Kantipur	27.7	85.32	P	PPL	NP		B3				1442271				
-1282931	Pātan	Patan	Lalitpur,Patan	27.68	85.31	P	PPL	NP		B3				226728				
-1264733	Lalitpur	Lalitpur		24.69	78.41	P	PPL	IN		36				133041				
-1277333	Bengaluru	Bengaluru	Bangalore,Bengaluru	12.97	77.59	P	PPL	IN		19				8443675				
-1270642	Gurugram	Gurugram	Gurgaon	28.46	77.03	P	PPL	IN		10				876824				
-1275339	Mumbai	Mumbai	Bombay	19.07	72.88	P	PPL	IN		16				12691836				
-1259229	Pune	Pune	Poona	18.52	73.86	P	PPL	IN		16				2935744				
-5128581	New York City	New York City	New York,NYC	40.71	-74.01	P	PPL	US		NY				8804190				
-5391959	San Francisco	San Francisco	SF	37.77	-122.42	P	PPL	US		CA				864816				
-4671654	Austin	Austin		30.27	-97.74	P	PPL	US		TX				961855				
-4140963	Washington	Washington	Washington D.C.	38.9	-77.04	P	PPL	US		DC				689545				
-4954265	West Springfield	West Springfield	Ireland	42.11	-72.62	P	PPL	US		MA				28391				
-4931972	Cambridge	Cambridge		42.38	-71.11	P	PPL	US		MA				118403				
-2653941	Cambridge	Cambridge		52.2	0.12	P	PPL	GB		ENG				145674				
-6167865	Toronto	Toronto		43.7	-79.42	P	PPL	CA		08				2731571				
-2988507	Paris	Paris		48.85	2.35	P	PPL	FR		11				2138551				
-2712414	Gävle	Gavle		60.67	17.14	P	PPL	SE		21				77586				
-2964574	Dublin	Dublin		53.33	-6.25	P	PPL	IE		L				1024027				
+2759794	Amsterdam	Amsterdam	Amsterdam,Amsterdama	52.37	4.89	P	PPL	NL		07				741636			Europe/Amsterdam	
+2747891	Rotterdam	Rotterdam		51.92	4.48	P	PPL	NL		11				598199			Europe/Amsterdam	
+2745912	Utrecht	Utrecht		52.09	5.12	P	PPL	NL		09				290529			Europe/Amsterdam	
+2950159	Berlin	Berlin	Berlino	52.52	13.41	P	PPL	DE		16				3426354			Europe/Berlin	
+2867714	Munich	Munich	Muenchen,München	48.14	11.58	P	PPL	DE		02				1260391			Europe/Berlin	
+2643743	London	London	Londres	51.51	-0.13	P	PPL	GB		ENG				8961989			Europe/London	
+6058560	London	London		42.98	-81.23	P	PPL	CA		08				346765			America/Toronto	
+1283240	Kathmandu	Kathmandu	Kathmandu,Kantipur	27.7	85.32	P	PPL	NP		B3				1442271			Asia/Kathmandu	
+1282931	Pātan	Patan	Lalitpur,Patan	27.68	85.31	P	PPL	NP		B3				226728			Asia/Kathmandu	
+1264733	Lalitpur	Lalitpur		24.69	78.41	P	PPL	IN		36				133041			Asia/Kolkata	
+1277333	Bengaluru	Bengaluru	Bangalore,Bengaluru	12.97	77.59	P	PPL	IN		19				8443675			Asia/Kolkata	
+1270642	Gurugram	Gurugram	Gurgaon	28.46	77.03	P	PPL	IN		10				876824			Asia/Kolkata	
+1275339	Mumbai	Mumbai	Bombay	19.07	72.88	P	PPL	IN		16				12691836			Asia/Kolkata	
+1259229	Pune	Pune	Poona	18.52	73.86	P	PPL	IN		16				2935744			Asia/Kolkata	
+5128581	New York City	New York City	New York,NYC	40.71	-74.01	P	PPL	US		NY				8804190			America/New_York	
+5391959	San Francisco	San Francisco	SF	37.77	-122.42	P	PPL	US		CA				864816			America/Los_Angeles	
+4671654	Austin	Austin		30.27	-97.74	P	PPL	US		TX				961855			America/Chicago	
+4140963	Washington	Washington	Washington D.C.	38.9	-77.04	P	PPL	US		DC				689545			America/New_York	
+4954265	West Springfield	West Springfield	Ireland	42.11	-72.62	P	PPL	US		MA				28391			America/New_York	
+4931972	Cambridge	Cambridge		42.38	-71.11	P	PPL	US		MA				118403			America/New_York	
+2653941	Cambridge	Cambridge		52.2	0.12	P	PPL	GB		ENG				145674			Europe/London	
+6167865	Toronto	Toronto		43.7	-79.42	P	PPL	CA		08				2731571			America/Toronto	
+2988507	Paris	Paris		48.85	2.35	P	PPL	FR		11				2138551			Europe/Paris	
+2712414	Gävle	Gavle		60.67	17.14	P	PPL	SE		21				77586			Europe/Stockholm	
+2964574	Dublin	Dublin		53.33	-6.25	P	PPL	IE		L				1024027			Europe/Dublin	

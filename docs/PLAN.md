@@ -250,7 +250,7 @@ own profile, a week of daily use, three unattended days) are not claimed here.
 | 6 | Built | Two missed complete listings → expired with reason; deadlines; 45-day stale; daily URL checks of scraped jobs; re-listing reactivates |
 | 7 | Built | Jobs (filters, views, search, sort, cards, drawer, undo, keyboard, new-jobs banner, manual import), Applications (board, table, CSV, follow-up, notes), Sources, Settings, Profile |
 | 8 | Built, not soak-tested | APScheduler tick every 10 min runs due source groups, daily lifecycle and FX; Sources page shows health, 7-run sparkline and budget |
-| 9 | Partly built | Insights, cover-letter drafts, a daily digest (in Insights and as Markdown) and desktop notifications for new strong matches are built. Map view, gap analysis beyond Insights, feedback-tuned weights and Tauri are not |
+| 9 | Partly built | Insights, cover-letter drafts, a daily digest (in Insights and as Markdown) and desktop notifications for new strong matches are built. A map view, "near a city" radius search and time zone overlap filter are built. Gap analysis beyond Insights, feedback-tuned weights and Tauri are not |
 
 ### Not built yet
 
@@ -264,7 +264,6 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   and Wellfound (answer crawlers with 403), IIMJobs and Hirist (pages load job data from
   a private API behind bot detection), TimesJobs (broken TLS certificate chain; we don't
   turn off certificate checks).
-- Location UI: map view, radius search, timezone overlap.
 
 ## Edge cases to keep covered
 
@@ -369,3 +368,8 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   above the threshold that you haven't hidden or tracked yet. Clicking one opens the
   job's drawer via `/jobs?job=ID`. The digest is a card on Insights and a Markdown file
   you can save; nothing is emailed.
+- 2026-10-26 — The map shows one circle per city (sized by job count, coloured by the best
+  match) with Leaflet and OpenStreetMap tiles; the browser fetches tiles from OSM, which
+  reveals the map area viewed but nothing about you. "Near a city" uses GeoNames
+  coordinates and a great-circle distance in SQL. Time zone overlap compares a 9-to-5 day
+  in your zone with each job city's zone (GeoNames), using today's UTC offsets.
