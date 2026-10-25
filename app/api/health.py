@@ -1,28 +1,16 @@
 """GET /health — database and Ollama status for the UI's sidebar footer."""
 
 import sqlite3
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter
 
+from app.api.deps import DbDep, OllamaDep, get_db, get_ollama  # noqa: F401 (tests override)
 from app.config import get_settings
 from app.db import db_status
-from app.llm import LLMError, OllamaClient
+from app.llm import LLMError
 from app.models import DbHealth, Health, OllamaHealth
 
 router = APIRouter()
-
-
-def get_db(request: Request) -> sqlite3.Connection:
-    return request.app.state.db
-
-
-def get_ollama(request: Request) -> OllamaClient:
-    return request.app.state.ollama
-
-
-DbDep = Annotated[sqlite3.Connection, Depends(get_db)]
-OllamaDep = Annotated[OllamaClient, Depends(get_ollama)]
 
 
 def _has_model(installed: list[str], wanted: str) -> bool:

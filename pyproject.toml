@@ -10,6 +10,13 @@ dependencies = [
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "sqlite-vec>=0.1.6",
+    "python-multipart>=0.0.20",
+    "pymupdf>=1.25",
+    "python-docx>=1.1",
+    "trafilatura>=2.0",
+    "selectolax>=0.3.21",
+    "python-jobspy>=1.1.80",
+    "apscheduler>=3.10,<4",
 ]
 
 [project.optional-dependencies]

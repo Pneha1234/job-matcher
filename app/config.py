@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     # First call after Ollama starts loads the 14B model into memory; allow for it.
     llm_timeout_s: float = 180.0
     ui_origin: str = "http://localhost:3000"
+    # Seconds between live requests to one source (random within the range).
+    scrape_delay_min: float = 3.0
+    scrape_delay_max: float = 8.0
+    # Repeat requests within this window are served from data/cache (0 turns it off).
+    http_cache_ttl_s: float = 3600
+    # Off in tests; the UI's Settings page can also switch scheduled runs off.
+    scheduler: bool = True
 
 
 @lru_cache

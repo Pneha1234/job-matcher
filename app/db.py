@@ -190,6 +190,61 @@ MIGRATIONS: list[str] = [
         embedding float[{EMBEDDING_DIM}] distance_metric=cosine
     );
     """,
+    # 2 — background tasks, per-source state and budgets, source miss tracking
+    """
+    CREATE TABLE tasks (
+        id          INTEGER PRIMARY KEY,
+        kind        TEXT NOT NULL,                      -- profile_parse, source_run, score...
+        status      TEXT NOT NULL DEFAULT 'queued'
+                    CHECK (status IN ('queued', 'running', 'done', 'error')),
+        progress    TEXT NOT NULL DEFAULT '[]',         -- JSON list of {step, state}
+        result      TEXT,                               -- JSON
+        error       TEXT,
+        created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        finished_at TEXT
+    );
+    CREATE INDEX tasks_kind ON tasks (kind, created_at);
+
+    CREATE TABLE source_state (
+        source          TEXT PRIMARY KEY,
+        status          TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused')),
+        paused_reason   TEXT,
+        paused_until    TEXT,                           -- null = until the user resumes
+        updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    );
+
+    CREATE TABLE source_budget (
+        source  TEXT NOT NULL,
+        day     TEXT NOT NULL,                          -- YYYY-MM-DD, UTC
+        used    INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (source, day)
+    );
+
+    -- A feed/ATS source that stops listing a job counts misses; 2 in a row expires it.
+    ALTER TABLE job_sources ADD COLUMN missed_runs INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE job_sources ADD COLUMN status TEXT NOT NULL DEFAULT 'listed'
+        CHECK (status IN ('listed', 'gone'));
+    ALTER TABLE job_sources ADD COLUMN scope TEXT;      -- e.g. a company board's slug
+    ALTER TABLE match_scores ADD COLUMN similarity REAL;
+
+    -- applications gains 'archived' (un-saved; history stays in application_events).
+    -- SQLite cannot alter a CHECK, so the table is rebuilt.
+    CREATE TABLE applications_v2 (
+        id                  INTEGER PRIMARY KEY,
+        job_id              INTEGER NOT NULL UNIQUE REFERENCES jobs (id),
+        status              TEXT NOT NULL DEFAULT 'saved' CHECK (status IN ('saved', 'applied',
+                            'interviewing', 'offer', 'rejected', 'withdrawn', 'archived')),
+        applied_at          TEXT,
+        notes               TEXT NOT NULL DEFAULT '',
+        status_changed_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+        updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    );
+    INSERT INTO applications_v2 (id, job_id, status, applied_at, notes, created_at, updated_at)
+        SELECT id, job_id, status, applied_at, notes, created_at, updated_at FROM applications;
+    DROP TABLE applications;
+    ALTER TABLE applications_v2 RENAME TO applications;
+    """,
 ]
 
 
