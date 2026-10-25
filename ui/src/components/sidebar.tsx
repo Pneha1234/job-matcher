@@ -1,11 +1,18 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { OllamaStatus } from "@/components/ollama-status";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { apiGet, type Summary } from "@/lib/api";
+import { ago } from "@/lib/format";
 import { cn } from "@/lib/utils";
+
+function useSummary() {
+  return useQuery({ queryKey: ["summary"], queryFn: () => apiGet<Summary>("/summary"), refetchInterval: 20_000 });
+}
 
 export const NAV = [
   { href: "/jobs", label: "Jobs" },
@@ -18,6 +25,12 @@ export const NAV = [
 
 function NavLinks() {
   const pathname = usePathname();
+  const { data } = useSummary();
+  const counts: Record<string, number | undefined> = {
+    "/jobs": data?.jobs_active,
+    "/applications": data?.applications_open,
+    "/sources": data?.sources_attention || undefined,
+  };
   return (
     <>
       {NAV.map(({ href, label }) => {
@@ -33,11 +46,26 @@ function NavLinks() {
             )}
           >
             {label}
+            {counts[href] !== undefined && (
+              <span
+                className={cn(
+                  "ml-auto hidden rounded-full bg-muted px-2 text-xs font-normal text-muted-foreground md:inline",
+                  href === "/sources" && "bg-bad-bg text-bad",
+                )}
+              >
+                {counts[href]?.toLocaleString()}
+              </span>
+            )}
           </Link>
         );
       })}
     </>
   );
+}
+
+function LastScrape() {
+  const { data } = useSummary();
+  return <div>{data?.last_scrape_at ? `Last scrape ${ago(data.last_scrape_at)}` : "No scrapes yet"}</div>;
 }
 
 export function Sidebar() {
@@ -52,7 +80,7 @@ export function Sidebar() {
       <NavLinks />
       <div className="mt-auto hidden border-t border-sidebar-border p-2 text-xs text-faint md:block">
         <OllamaStatus />
-        <div>No scrapes yet</div>
+        <LastScrape />
         <div className="mt-2">
           <ThemeToggle />
         </div>

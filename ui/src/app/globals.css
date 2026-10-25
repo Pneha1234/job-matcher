@@ -210,4 +210,16 @@
   body {
     @apply bg-background text-foreground text-sm;
   }
+  input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="file"])),
+  select,
+  textarea {
+    @apply rounded-lg border border-input bg-card px-2.5 py-1.5 text-sm text-foreground;
+  }
+  input[type="checkbox"],
+  input[type="range"] {
+    accent-color: var(--primary);
+  }
+  button {
+    cursor: pointer;
+  }
 }
