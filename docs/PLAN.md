@@ -378,3 +378,10 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   processes (or reuses ones already running from `make dev`), opens the same UI on
   localhost:3000, and stops its children's process groups on quit. Only the UI on
   localhost may call Tauri, and only for notifications. Logs go to data/logs/.
+- 2026-10-26 — No login: one user on one machine, servers on 127.0.0.1 only, and anyone
+  with access to the Mac account could read the database file anyway. The real threat is
+  web pages in the user's own browser calling localhost, so the API rejects requests
+  whose Host or X-Forwarded-Host isn't local (DNS rebinding) and any data-changing
+  request whose Origin is another site or whose Sec-Fetch-Site is cross-site. Requests
+  without those headers come from local tools and stay allowed. A login comes only if
+  the app is ever hosted or shared.

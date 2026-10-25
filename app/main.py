@@ -24,6 +24,7 @@ from app.db import init_db
 from app.llm import OllamaClient
 from app.matching.service import start_rescore
 from app.normalize.ingest import backfill_timezones
+from app.security import LocalOnlyMiddleware
 from app.seeds import seed
 from app.tasks import TaskRunner
 
@@ -53,6 +54,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Job Matcher", lifespan=lifespan)
+app.add_middleware(LocalOnlyMiddleware)
 # The UI normally reaches the API through Next.js's /api rewrite; CORS covers direct calls.
 app.add_middleware(
     CORSMiddleware,
