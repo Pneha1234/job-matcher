@@ -214,3 +214,23 @@ def test_notifications_and_digest(client, db):
     s["notify"] = False
     client.put("/settings", json=s)
     assert client.get("/notifications", params={"since": "2000-01-01T00:00:00Z"}).json() == []
+
+
+def test_missing_skills_count_spellings_together(client, db, fake_ollama):
+    import json
+
+    from tests.fakes import ASSESSMENT
+
+    add_job(db, 1)
+    add_job(db, 2, title="Python Engineer", company="Other")
+    save_profile(db)
+    skills = [
+        {"skill": "Python", "status": "matched"},
+        {"skill": "kubernetes", "status": "missing"},
+    ]
+    lower = {**ASSESSMENT, "required_skills": skills}
+    fake_ollama.queue("JobAssessment", json.dumps(ASSESSMENT), json.dumps(lower))
+    wait_task(client, client.post("/scoring/run").json()["task_id"])
+    gaps = client.get("/insights").json()["missing_skills"]
+    assert gaps[0]["share"] == 100 and gaps[0]["skill"].lower() == "kubernetes"
+    assert len([g for g in gaps if g["skill"].lower() == "kubernetes"]) == 1

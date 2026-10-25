@@ -30,8 +30,12 @@ async def insights(db: DbDep):
     ).fetchall()
     top = scored[:TOP]
     gaps: Counter[str] = Counter()
+    names: dict[str, str] = {}  # "typescript" -> "TypeScript", the first spelling seen
     for r in top:
-        gaps.update({s for s in loads(r["missing_skills"], []) or []})
+        skills = {s.strip(): s.strip().lower() for s in loads(r["missing_skills"], []) or []}
+        for shown, key in skills.items():
+            names.setdefault(key, shown)
+        gaps.update(set(skills.values()))
     # Of applications that got past "saved", how many reached an interview or offer.
     applied_ever = db.execute(
         "SELECT COUNT(DISTINCT application_id) FROM application_events WHERE to_status IN "
@@ -91,7 +95,10 @@ async def insights(db: DbDep):
             "response_rate": round(100 * responded / applied_ever) if applied_ever else None,
         },
         "missing_skills": (
-            [{"skill": s, "share": round(100 * n / len(top))} for s, n in gaps.most_common(8)]
+            [
+                {"skill": names[s], "share": round(100 * n / len(top))}
+                for s, n in gaps.most_common(8)
+            ]
             if top
             else []
         ),
