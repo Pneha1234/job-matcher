@@ -51,11 +51,11 @@ change whenever a decision is made or reversed (see the decision log at the end)
 | Scheduler | APScheduler | No Redis/Celery for a single user |
 | LLM | Ollama, `qwen2.5:14b` (fallback `llama3.1:8b`) | Run **natively** on macOS, not in Docker — Docker on Mac has no Metal GPU access. 24 GB RAM fits 14B |
 | Embeddings | `bge-m3` via Ollama | Multilingual (NL, DE, Hindi, Nepali postings) |
-| Scraping | `python-jobspy`, `httpx`, `selectolax`, `extruct` | |
+| Scraping | `python-jobspy`, `httpx`, `selectolax` | schema.org JobPosting read by our own tolerant JSON-LD parser, not `extruct` |
 | Parsing | `pymupdf`, `python-docx`, `trafilatura` | |
 | Locations | GeoNames dataset (offline) | City/region/country + lat/lon + aliases |
 | FX rates | ECB daily reference rates (or Frankfurter) | Free |
-| Frontend | Next.js + TypeScript, Tailwind, shadcn/ui, TanStack Query/Table, dnd-kit, Recharts | |
+| Frontend | Next.js + TypeScript, Tailwind, shadcn/ui, TanStack Query | Native drag and drop and inline SVG charts instead of dnd-kit, TanStack Table and Recharts (see decision log) |
 | Map | Leaflet + OpenStreetMap tiles (or Protomaps offline) | |
 | Desktop (later) | Tauri wrapping the same UI | Native notifications |
 
@@ -112,7 +112,9 @@ company board adds that company to the crawl list.
 SerpAPI, ScraperAPI, Bright Data, any paid proxy, any paid job-data API.
 
 ### Source rules
-- Each source is one plugin with the same interface: `fetch() -> list[RawJob]`.
+- Each source is one plugin with the same interface: `fetch(ctx) -> FetchResult`, where the
+  result carries the `RawJob`s plus the scopes (e.g. one company board) that were listed
+  completely, so lifecycle can tell "removed" from "not fetched this time".
 - Each source has a daily request budget, random 3–8 s delays, cached responses.
 - Small sites (Nepali boards) are crawled very gently: a few times a day.
 - A source returning 0 jobs or a spike in errors shows red on the Sources page.
@@ -159,6 +161,9 @@ SerpAPI, ScraperAPI, Bright Data, any paid proxy, any paid job-data API.
 - `companies` — name, platform, slug, last_crawled_at
 - `scrape_runs` — source, timings, found, new, errors, budget used
 - `saved_searches`, `settings`
+- `tasks` — background work and its step-by-step progress, polled by the UI
+- `source_state`, `source_budget` — paused sources (with reason and until when) and
+  requests used per source per day
 
 ## Matching
 
@@ -229,6 +234,35 @@ Reference mockup: [`docs/mockups/job-matcher-mockup.html`](mockups/job-matcher-m
 | 8 | Scheduling + monitoring | Runs unattended 3 days, all sources healthy |
 | 9 | Extras: Insights, map view, digest, gap analysis, cover letters, feedback weights, Tauri | As desired |
 
+## Build status (2026-10-25)
+
+What exists and how it was checked. "Done when" criteria that need you (signing off your
+own profile, a week of daily use, three unattended days) are not claimed here.
+
+| # | State | Notes |
+|---|---|---|
+| 0 | Done | `make dev`, `make check`, `make smoke` (real Ollama round-trip) |
+| 1 | Built, needs your resume | Wizard: PDF/DOCX upload, GitHub (public API), portfolio (`trafilatura`), LinkedIn export ZIP, live progress, review/edit with per-skill provenance, diff vs previous version, versions kept and switchable. Checked end to end in the browser with a sample resume on qwen2.5:14b |
+| 2 | Built | JobSpy: LinkedIn (guest), Indeed, Glassdoor, Google Jobs, Naukri, one source each, driven by saved searches. A live run stored 51 LinkedIn jobs for two searches; the ≥500 target comes with more searches |
+| 3 | Partly built | ATS: Greenhouse, Lever, Ashby, Workable, Recruitee, Personio, SmartRecruiters, Workday. Feeds: Remotive, RemoteOK, Arbeitnow, Himalayas, Jobicy, We Work Remotely, HN Who's Hiring, JobTech (Sweden). Nepal: Merojob, Kumarijob. Company sites (JSON-LD), Common Crawl discovery, self-growth. One live pass over 15 sources with 7 seed boards stored 1,531 active jobs; the 52 seed boards alone list about 9,000. Not built: see "Not built yet" |
+| 4 | Built | Salary (k, ranges, LPA, lakh/crore, NPR/Rs on Nepali boards, hourly/monthly), ECB FX with the NPR peg, GeoNames cities15000 with aliases and ambiguity rules, remote scopes, visa, relocation, job type, language requirements, India fields, canonical-key dedup. A 25-job spot check found four bugs, all fixed with tests; a 50-job check is yours to do |
+| 5 | Built | Stage A embeddings + hard filters, Stage B validated LLM assessment, % in code, cached per (job, profile version), unscored + retry, weights re-rank instantly |
+| 6 | Built | Two missed complete listings → expired with reason; deadlines; 45-day stale; daily URL checks of scraped jobs; re-listing reactivates |
+| 7 | Built | Jobs (filters, views, search, sort, cards, drawer, undo, keyboard, new-jobs banner, manual import), Applications (board, table, CSV, follow-up, notes), Sources, Settings, Profile |
+| 8 | Built, not soak-tested | APScheduler tick every 10 min runs due source groups, daily lifecycle and FX; Sources page shows health, 7-run sparkline and budget |
+| 9 | Partly built | Insights page and cover-letter drafts are built. Map view, digest, gap analysis beyond Insights, feedback-tuned weights, notifications and Tauri are not |
+
+### Not built yet
+
+- Sources: Bundesagentur (the public key returns 403), keyed APIs (Adzuna, Jooble,
+  Careerjet, Reed, USAJobs, France Travail, NAV, Job Bank), Teamtailor, Keka/Darwinbox/
+  Zoho Recruit/Freshteam, Foundit/Shine/TimesJobs/Instahyre/Hirist/Cutshort/Wellfound/
+  IIMJobs/Internshala/Freshersworld/NCS, JobsNepal (no JobPosting markup), Jobejee, Lok
+  Sewa PDF notices.
+- Embedding-similarity dedup (canonical key only so far).
+- Location UI: map view, radius search, timezone overlap.
+- Notifications for new 85%+ matches (the setting is stored, nothing sends yet).
+
 ## Edge cases to keep covered
 
 - Same job on several boards or in several cities → one job, many sources/locations.
@@ -256,3 +290,50 @@ Reference mockup: [`docs/mockups/job-matcher-mockup.html`](mockups/job-matcher-m
   APIs and proxies excluded); proper UI, not API-driven; worldwide coverage
   including India and Nepal; LinkedIn via data export, never scraped logged in.
 - 2026-10-22 — Ollama runs natively on macOS (no Metal GPU in Docker).
+- 2026-10-25 — Background work runs as in-process asyncio tasks with a `tasks` table the
+  UI polls for progress; APScheduler adds one 10-minute tick that runs any source group
+  whose interval has passed, plus a daily lifecycle/FX pass. No queue, no Redis.
+- 2026-10-25 — Dedup key is normalised company + normalised title (gender markers and
+  legal suffixes stripped), without location, so one posting in several cities is one job
+  with several locations. Embedding-similarity dedup is deferred.
+- 2026-10-25 — Ambiguous city names resolve only from the posting's country, the
+  company's known office countries, or a candidate at least 20× bigger than the next
+  (London UK vs London, Ontario). A city whose main name matches beats one that only lists
+  it as an alias, unless the alias-only city is bigger (Lalitpur is also Patan, Nepal).
+  Anything else stays "Location unclear".
+- 2026-10-25 — A salary's pay period is inferred from the number only when it can't be
+  anything else (≥10,000 → yearly, ≤300 → hourly; for INR/NPR ≥5 lakh → yearly).
+  Otherwise the amounts are kept and the annual figure stays empty.
+- 2026-10-25 — NPR converts through the ECB's INR rate at the fixed 1.6 peg; the ECB
+  doesn't publish NPR.
+- 2026-10-25 — The LLM never produces a number. It classifies required and nice-to-have
+  skills (matched/partial/missing), seniority, domain and location/language fit; code maps
+  those to 0–100. Location eligibility (remote scope vs where you live, target countries,
+  visa) and spoken-language gaps are computed in code and override the model. A part the
+  posting gives no basis for drops out of the weighted average; with no required skills
+  the job stays unscored. Changing weights recomputes stored percentages, no LLM call.
+- 2026-10-25 — Stage A takes the 4,096 nearest jobs from sqlite-vec (its k limit), then
+  applies the hard filters and keeps the shortlist size from Settings (default 150).
+- 2026-10-25 — Un-saving a job sets its application to a new `archived` status; the
+  status history stays in `application_events`. Saved searches are archived, not deleted.
+- 2026-10-25 — JobSpy is one source per site so each shows its own health. Searches come
+  from Settings → Saved searches ("role · place"); the budget counts searches. Indeed and
+  Glassdoor need a supported country, which excludes Nepal.
+- 2026-10-25 — Nepal boards: Merojob and Kumarijob are crawled from their sitemaps, at
+  most 40 new posting pages per run; the sitemap alone confirms known postings are still
+  listed. Kumarijob's JSON-LD has unterminated strings, so JSON-LD is read by our own
+  tolerant parser instead of `extruct`.
+- 2026-10-25 — Polite HTTP: one shared client per source with 3–8 s random gaps, a 1-hour
+  disk cache (longer for sitemaps and posting pages), a daily request budget, and a pause
+  on 429, 403 or a CAPTCHA page. Budget exhaustion pauses until tomorrow; a block pauses
+  until you resume it on the Sources page.
+- 2026-10-25 — First run seeds 52 company boards checked to answer on 2026-10-25,
+  including CloudFactory (Workable). Common Crawl discovery and self-growth add more;
+  ATS sources crawl the 120 least recently crawled boards per run.
+- 2026-10-25 — UI dependencies kept small: native drag and drop with a status select on
+  every card (keyboard reachable) instead of dnd-kit, inline SVG charts instead of
+  Recharts, a plain table instead of TanStack Table.
+- 2026-10-25 — The mockup's "Use sample resume" button is not built; the wizard takes only
+  your own files. An unsaved draft is offered again after a reload.
+- 2026-10-25 — If the LLM can't read the resume, the draft keeps only what GitHub and the
+  LinkedIn export show (nothing invented), with "Try again" and fill-by-hand.
