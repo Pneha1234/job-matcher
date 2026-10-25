@@ -24,14 +24,14 @@ ui/node_modules: ui/package.json
 dev: setup ollama
 	@trap 'kill 0' EXIT; \
 	$(BIN)/uvicorn app.main:app --reload --port $(API_PORT) & \
-	(cd ui && API_URL=http://127.0.0.1:$(API_PORT) npm run dev -- --port $(UI_PORT)) & \
+	(cd ui && API_URL=http://127.0.0.1:$(API_PORT) npm run dev -- --port $(UI_PORT) --hostname 127.0.0.1) & \
 	wait
 
 api: setup
 	$(BIN)/uvicorn app.main:app --reload --port $(API_PORT)
 
 ui: ui/node_modules
-	cd ui && API_URL=http://127.0.0.1:$(API_PORT) npm run dev -- --port $(UI_PORT)
+	cd ui && API_URL=http://127.0.0.1:$(API_PORT) npm run dev -- --port $(UI_PORT) --hostname 127.0.0.1
 
 ## Ollama runs natively (Homebrew service) so it can use the Metal GPU.
 ollama:

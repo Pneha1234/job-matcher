@@ -78,7 +78,8 @@ fn start_services() -> Result<Vec<Child>, String> {
                 "The UI isn't built. Run `make desktop` (or `cd ui && npm run build`).".into(),
             );
         }
-        let cmd = format!("npm run start -- --port {UI_PORT}");
+        // Loopback only: the UI must not be reachable from other machines on the network.
+        let cmd = format!("npm run start -- --port {UI_PORT} --hostname 127.0.0.1");
         children.push(spawn(ui, &cmd, "ui.log").map_err(|e| e.to_string())?);
     }
     Ok(children)
@@ -130,7 +131,7 @@ fn main() {
                     Err(message) => return show_error(&window, &message),
                 }
                 if wait_until_ready() {
-                    let url = format!("http://localhost:{UI_PORT}/jobs");
+                    let url = format!("http://127.0.0.1:{UI_PORT}/jobs");
                     let _ = window.navigate(url.parse().expect("valid URL"));
                 } else {
                     show_error(
