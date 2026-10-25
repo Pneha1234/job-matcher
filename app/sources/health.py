@@ -62,9 +62,11 @@ def source_rows(conn: sqlite3.Connection, running: dict[str, int]) -> list[dict]
         health, detail = _health(states.get(name), runs, missing)
         label = src.label
         if src.platform and src.platform != "jsonld":
-            label = f"{src.label} ({boards.get(src.platform, 0)} companies)"
+            n = boards.get(src.platform, 0)
+            label = f"{src.label} ({n} {'company' if n == 1 else 'companies'})"
         elif src.platform == "jsonld":
-            label = f"{src.label} ({boards.get('jsonld', 0)} sites)"
+            n = boards.get("jsonld", 0)
+            label = f"{src.label} ({n} {'site' if n == 1 else 'sites'})"
         last = runs[0] if runs else None
         out.append(
             {

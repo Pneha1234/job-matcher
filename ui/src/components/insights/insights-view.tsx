@@ -134,7 +134,7 @@ export function InsightsView() {
             <div
               key={f.label}
               className="my-1.5 flex h-[30px] items-center rounded-md bg-primary px-2.5 text-[13px] whitespace-nowrap text-primary-foreground"
-              style={{ width: `${Math.max(28, (f.value / funnelMax) * 100)}%`, opacity: 1 - i * 0.12 }}
+              style={{ width: `${Math.max(28, (f.value / funnelMax) * 100)}%`, minWidth: "max-content", opacity: 1 - i * 0.12 }}
             >
               {f.label} · {f.value}
             </div>

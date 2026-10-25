@@ -303,7 +303,7 @@ function Overview({ version, onUpload, onPreferences }: { version: ProfileVersio
           {p.skills.map((s) => (
             <Chip key={s.name} tone="acc" title={s.sources.join(" + ")}>
               {s.name}
-              {s.years ? <span className="text-faint">· {s.years} yrs</span> : null}
+              {s.years ? <span className="text-faint">· {s.years === 1 ? "1 yr" : `${s.years} yrs`}</span> : null}
             </Chip>
           ))}
         </div>

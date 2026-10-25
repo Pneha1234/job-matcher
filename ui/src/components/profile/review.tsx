@@ -63,7 +63,7 @@ export function ProfileEditor({ value, onChange }: { value: Profile; onChange: (
         {value.skills.map((s, i) => (
           <Chip key={s.name} tone={s.sources.includes("Model inferred") ? "warn" : "acc"} title={s.sources.join(" + ")}>
             {s.name}
-            {s.years ? <span className="text-faint">· {s.years} yrs</span> : null}
+            {s.years ? <span className="text-faint">· {s.years === 1 ? "1 yr" : `${s.years} yrs`}</span> : null}
             <button
               type="button"
               aria-label={`Remove ${s.name}`}
