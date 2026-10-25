@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Job Matcher</title>
+<style>
+  :root { --bg: #f6f7f9; --text: #14171c; --muted: #5b6472; --accent: #4f46e5; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0f1115; --text: #e8eaee; --muted: #a3abb8; --accent: #8b85ff; } }
+  html, body { height: 100%; margin: 0; }
+  body { display: grid; place-items: center; background: var(--bg); color: var(--text);
+         font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+  .logo { width: 48px; height: 48px; border-radius: 12px; background: var(--accent); color: #fff;
+          display: grid; place-items: center; font-weight: 700; font-size: 22px; margin: 0 auto 14px; }
+  .muted { color: var(--muted); }
+  .error { color: #b91c1c; max-width: 460px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+  <div style="text-align: center">
+    <div class="logo">J</div>
+    <div id="status">Starting Job Matcher…</div>
+    <div class="muted">Starting the local API and interface. This takes a few seconds.</div>
+  </div>
+</body>
+</html>

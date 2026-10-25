@@ -68,7 +68,8 @@ the UI polls. An APScheduler tick runs each source group on its schedule.
 | LLM and embeddings | Ollama: `qwen2.5:14b` (or `llama3.1:8b`), `bge-m3` |
 | Ingestion | httpx, python-jobspy, selectolax, PyMuPDF, python-docx, trafilatura |
 | Reference data | GeoNames `cities15000`, ECB daily rates |
-| Frontend | Next.js, TypeScript, Tailwind CSS, shadcn/ui, TanStack Query |
+| Frontend | Next.js, TypeScript, Tailwind CSS, shadcn/ui, TanStack Query, Leaflet |
+| Desktop | Tauri 2 (Rust) |
 
 ## Getting started
 
@@ -98,6 +99,20 @@ Then open http://localhost:3000:
 
 On first start the app downloads GeoNames (about 3 MB) and the ECB rates into `data/`,
 which is git-ignored.
+
+## Desktop app
+
+A [Tauri](https://tauri.app) shell wraps the same UI in a native macOS window with native
+notifications. It starts the API and the built UI itself (or reuses a running
+`make dev`) and stops them when you quit. It needs Rust ([rustup.rs](https://rustup.rs)).
+
+```bash
+make desktop       # build the UI and bundle desktop/src-tauri/target/release/bundle/macos/Job Matcher.app
+make desktop-dev   # open the desktop window without bundling
+```
+
+The app runs from this repository (set `JM_HOME` to point it elsewhere); server logs go to
+`data/logs/`.
 
 ## Development
 

@@ -57,7 +57,7 @@ change whenever a decision is made or reversed (see the decision log at the end)
 | FX rates | ECB daily reference rates (or Frankfurter) | Free |
 | Frontend | Next.js + TypeScript, Tailwind, shadcn/ui, TanStack Query | Native drag and drop and inline SVG charts instead of dnd-kit, TanStack Table and Recharts (see decision log) |
 | Map | Leaflet + OpenStreetMap tiles (or Protomaps offline) | |
-| Desktop (later) | Tauri wrapping the same UI | Native notifications |
+| Desktop | Tauri 2 wrapping the same UI | Native notifications; `make desktop` |
 
 ## Sources (all free)
 
@@ -250,7 +250,7 @@ own profile, a week of daily use, three unattended days) are not claimed here.
 | 6 | Built | Two missed complete listings → expired with reason; deadlines; 45-day stale; daily URL checks of scraped jobs; re-listing reactivates |
 | 7 | Built | Jobs (filters, views, search, sort, cards, drawer, undo, keyboard, new-jobs banner, manual import), Applications (board, table, CSV, follow-up, notes), Sources, Settings, Profile |
 | 8 | Built, not soak-tested | APScheduler tick every 10 min runs due source groups, daily lifecycle and FX; Sources page shows health, 7-run sparkline and budget |
-| 9 | Partly built | Insights, cover-letter drafts, a daily digest (in Insights and as Markdown) and desktop notifications for new strong matches are built. A map view, "near a city" radius search and time zone overlap filter are built. Gap analysis beyond Insights, feedback-tuned weights and Tauri are not |
+| 9 | Partly built | Insights, cover-letter drafts, a daily digest (in Insights and as Markdown) and desktop notifications for new strong matches are built. A map view, "near a city" radius search and time zone overlap filter are built. A Tauri desktop app (macOS) with native notifications is built. Gap analysis beyond Insights and feedback-tuned weights are not |
 
 ### Not built yet
 
@@ -373,3 +373,8 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   reveals the map area viewed but nothing about you. "Near a city" uses GeoNames
   coordinates and a great-circle distance in SQL. Time zone overlap compares a 9-to-5 day
   in your zone with each job city's zone (GeoNames), using today's UTC offsets.
+- 2026-10-26 — The desktop app (Tauri 2) is a thin native shell, not a second frontend.
+  It shows a loading page, starts uvicorn and `next start` from this repository as child
+  processes (or reuses ones already running from `make dev`), opens the same UI on
+  localhost:3000, and stops its children's process groups on quit. Only the UI on
+  localhost may call Tauri, and only for notifications. Logs go to data/logs/.

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { Btn, Card, Check, Chip, Field } from "@/components/bits";
+import { nativeNotifications } from "@/components/notifications";
 import { PreferencesForm, useSettings } from "@/components/profile/preferences";
 import { useToast } from "@/components/toast";
 import {
@@ -225,7 +226,8 @@ function NotificationsCard({ data }: { data: SettingsResponse }) {
   // The browser's permission isn't known during prerender; read it on the client only.
   const browserPermission = useSyncExternalStore(
     () => () => {},
-    () => (typeof Notification === "undefined" ? "unsupported" : Notification.permission),
+    () =>
+      nativeNotifications() ? "native" : typeof Notification === "undefined" ? "unsupported" : Notification.permission,
     () => "default",
   );
   const [asked, setAsked] = useState<string | null>(null);
@@ -239,7 +241,8 @@ function NotificationsCard({ data }: { data: SettingsResponse }) {
     <Card>
       <b>Notifications</b>
       <div className="mb-2 text-xs text-muted-foreground">
-        A desktop notification when a newly scored job reaches your threshold, while Job Matcher is open in a browser tab.
+        A desktop notification when a newly scored job reaches your threshold, while Job Matcher is open (the desktop app or a
+        browser tab).
       </div>
       <Check checked={s.notify} onChange={(v) => setS({ ...s, notify: v })}>
         Notify me about new strong matches
@@ -257,7 +260,9 @@ function NotificationsCard({ data }: { data: SettingsResponse }) {
         <b className="text-right">{s.notify_threshold}%</b>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        {permission === "granted" ? (
+        {permission === "native" ? (
+          <Chip tone="ok">Native notifications (desktop app)</Chip>
+        ) : permission === "granted" ? (
           <Chip tone="ok">Browser notifications allowed</Chip>
         ) : permission === "unsupported" ? (
           <Chip>This browser can&apos;t show notifications</Chip>

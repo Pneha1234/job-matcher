@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Lets the local UI on localhost:3000 send native notifications; nothing else.",
+  "windows": ["main"],
+  "remote": {
+    "urls": ["http://localhost:3000/*", "http://127.0.0.1:3000/*"]
+  },
+  "permissions": [
+    "core:default",
+    "notification:default"
+  ]
+}
