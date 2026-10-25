@@ -256,10 +256,14 @@ async def run_scoring(
     settings = load_settings(conn)
     vec = await profile_vector(conn, ollama, version_id, profile)
     picks = shortlist(conn, settings, vec, limit or settings.shortlist_size)
+    # Jobs already scored are kept; ones the model failed on are tried again. Jobs with no
+    # description stay skipped, since nothing has changed for them.
     scored_ids = {
         r[0]
         for r in conn.execute(
-            "SELECT job_id FROM match_scores WHERE profile_version_id = ?", (version_id,)
+            "SELECT job_id FROM match_scores WHERE profile_version_id = ? AND (status = 'scored' "
+            "OR error LIKE 'The source gave no description%')",
+            (version_id,),
         )
     }
     todo = [(j, s) for j, s in picks if j not in scored_ids]

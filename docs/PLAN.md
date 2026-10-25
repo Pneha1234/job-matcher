@@ -393,6 +393,11 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   at most 8 required and 5 nice-to-have skills and two sentences of explanation per job;
   at most 40 skills, 8 roles and a one-sentence summary per profile. The model no longer
   returns a per-skill "last used" year; GitHub still supplies it. (3) Jobs are scored
-  best-first and each score shows on Jobs as soon as it lands. Running several requests
+  best-first and each score shows on Jobs as soon as it lands. qwen2.5:7b left the
+  required-skills list empty for a third of postings, so the schema now requires at least
+  one (Ollama enforces it while generating), skill names are capped at 40 characters, and
+  a later run retries jobs the model failed on. Result on the same Mac: profile reading
+  101 s → 42 s, scoring about 35 s → 8 s per job (139 jobs in about 20 minutes instead of
+  about 90), every job scored. Running several requests
   at once (OLLAMA_NUM_PARALLEL) is a further option that needs the Ollama service
   reconfigured; not done.

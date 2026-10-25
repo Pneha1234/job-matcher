@@ -16,14 +16,16 @@ SUB_KEYS = ("required", "nice", "seniority", "domain", "location")
 
 
 class SkillCheck(BaseModel):
-    skill: str = Field(min_length=1, max_length=80)
+    skill: str = Field(min_length=1, max_length=40)
     status: Literal["matched", "partial", "missing"]
 
 
 class JobAssessment(BaseModel):
     # Caps keep the answer short: on a laptop the model writes about 10-20 tokens a second,
     # so answer length is the scoring time.
-    required_skills: list[SkillCheck] = Field(default_factory=list, max_length=10)
+    # At least one: smaller models otherwise return an empty list and the job can't be
+    # scored (qwen2.5:7b did this for a third of postings).
+    required_skills: list[SkillCheck] = Field(min_length=1, max_length=10)
     nice_to_have_skills: list[SkillCheck] = Field(default_factory=list, max_length=6)
     seniority_fit: Literal["match", "one_level_off", "two_or_more_off", "unclear"]
     domain_fit: Literal["same", "related", "different", "unclear"]
@@ -34,7 +36,8 @@ class JobAssessment(BaseModel):
 SYSTEM = (
     "You compare one job posting with a candidate profile and classify the fit. Be strict "
     "and literal, and brief. required_skills: the most important skills, tools and "
-    "qualifications the posting requires (at most 8), each marked matched (the profile "
+    "qualifications the posting requires (at least 1, at most 8; short names of one to four "
+    "words, in English), each marked matched (the profile "
     "clearly has it), partial (related or less experience) or missing. "
     "nice_to_have_skills: ones it calls a plus or preferred (at most 5). seniority_fit "
     "compares the level the posting asks for with the candidate's. domain_fit compares "

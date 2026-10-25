@@ -32,8 +32,11 @@ def test_unclear_parts_drop_out_and_no_required_skills_means_no_score():
     w = Weights()
     expected = (62 * 50 + 100 * 15 + 100 * 15 + 100 * 10) / 90
     assert final_pct(subs, w) == pytest.approx(expected, abs=0.05)
-    none = JobAssessment.model_validate({**ASSESSMENT, "required_skills": []})
-    assert final_pct(sub_scores(none, "eligible", []), w) is None
+    # An empty required list is an invalid answer (retried, then unscored), and a missing
+    # required sub-score never yields a percentage.
+    with pytest.raises(ValueError):
+        JobAssessment.model_validate({**ASSESSMENT, "required_skills": []})
+    assert final_pct({**subs, "required": None}, w) is None
     assert final_pct(subs, Weights(required=0, nice=0, seniority=0, domain=0, location=0)) is None
 
 
@@ -150,3 +153,16 @@ def test_job_without_description_is_unscored_without_an_llm_call(client, db, fak
     assert task["result"]["status"] == "unscored"
     assert "no description" in task["result"]["error"]
     assert not [c for c in fake_ollama.calls if "messages" in c]
+
+
+def test_failed_jobs_are_retried_on_the_next_run(client, db, fake_ollama):
+    job_id = add_job(db, 1)
+    save_profile(db)
+    fake_ollama.queue("JobAssessment", '{"required_skills": []}', '{"required_skills": []}')
+    wait_task(client, client.post("/scoring/run").json()["task_id"])
+    first = db.execute("SELECT status FROM match_scores WHERE job_id = ?", (job_id,)).fetchone()
+    assert first["status"] == "unscored"
+    task = wait_task(client, client.post("/scoring/run").json()["task_id"])
+    assert task["result"]["scored"] == 1
+    again = db.execute("SELECT status FROM match_scores WHERE job_id = ?", (job_id,)).fetchone()
+    assert again["status"] == "scored"
