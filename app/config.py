@@ -15,8 +15,13 @@ class Settings(BaseSettings):
     ollama_url: str = "http://127.0.0.1:11434"
     llm_model: str = "qwen2.5:14b"
     embed_model: str = "bge-m3"
-    # First call after Ollama starts loads the 14B model into memory; allow for it.
-    llm_timeout_s: float = 180.0
+    # A long resume takes the 14B model about two minutes to read on a laptop, and the
+    # first call after Ollama starts also loads the model into memory.
+    llm_timeout_s: float = 600.0
+    # Ollama's default context is 4,096 tokens and it silently drops the start of longer
+    # prompts. A long resume plus a LinkedIn export, or a long posting plus the profile,
+    # needs more.
+    llm_num_ctx: int = 16384
     ui_origin: str = "http://localhost:3000"
     # Seconds between live requests to one source (random within the range).
     scrape_delay_min: float = 3.0

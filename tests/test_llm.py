@@ -37,6 +37,8 @@ def test_valid_json_first_try():
     assert len(seen) == 1
     assert seen[0]["format"] == Answer.model_json_schema()
     assert seen[0]["stream"] is False
+    # Ollama's 4,096-token default would silently cut long prompts.
+    assert seen[0]["options"]["num_ctx"] == 16384
 
 
 def test_retries_once_then_succeeds():

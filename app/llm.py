@@ -44,6 +44,7 @@ class OllamaClient:
     ):
         settings = get_settings()
         self.model = model or settings.llm_model
+        self.num_ctx = settings.llm_num_ctx
         self.embed_model = embed_model or settings.embed_model
         self._client = httpx.AsyncClient(
             base_url=base_url or settings.ollama_url,
@@ -105,7 +106,7 @@ class OllamaClient:
                     "messages": messages,
                     "format": schema.model_json_schema(),
                     "stream": False,
-                    "options": {"temperature": temperature},
+                    "options": {"temperature": temperature, "num_ctx": self.num_ctx},
                 },
             )
             content = data.get("message", {}).get("content", "")
