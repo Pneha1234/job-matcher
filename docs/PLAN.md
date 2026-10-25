@@ -245,7 +245,7 @@ own profile, a week of daily use, three unattended days) are not claimed here.
 | 1 | Built, needs your resume | Wizard: PDF/DOCX upload, GitHub (public API), portfolio (`trafilatura`), LinkedIn export ZIP, live progress, review/edit with per-skill provenance, diff vs previous version, versions kept and switchable. Checked end to end in the browser with a sample resume on qwen2.5:14b |
 | 2 | Built | JobSpy: LinkedIn (guest), Indeed, Glassdoor, Google Jobs, Naukri, one source each, driven by saved searches. A live run stored 51 LinkedIn jobs for two searches; the ≥500 target comes with more searches |
 | 3 | Partly built | ATS: Greenhouse, Lever, Ashby, Workable, Recruitee, Personio, SmartRecruiters, Teamtailor, Workday. Free-key APIs: Adzuna, Jooble, Reed, USAJobs, France Travail. Feeds: Remotive, RemoteOK, Arbeitnow, Himalayas, Jobicy, We Work Remotely, HN Who's Hiring, JobTech (Sweden). Nepal: Merojob, Kumarijob, JobsNepal, Jobejee. India: Shine, Internshala, Freshersworld. Company sites (JSON-LD or microdata), Common Crawl discovery, self-growth. One live pass over 15 sources with 7 seed boards stored 1,531 active jobs; the 52 seed boards alone list about 9,000. Not built: see "Not built yet" |
-| 4 | Built | Salary (k, ranges, LPA, lakh/crore, NPR/Rs on Nepali boards, hourly/monthly), ECB FX with the NPR peg, GeoNames cities15000 with aliases and ambiguity rules, remote scopes, visa, relocation, job type, language requirements, India fields, canonical-key dedup. A 25-job spot check found four bugs, all fixed with tests; a 50-job check is yours to do |
+| 4 | Built | Salary (k, ranges, LPA, lakh/crore, NPR/Rs on Nepali boards, hourly/monthly), ECB FX with the NPR peg, GeoNames cities15000 with aliases and ambiguity rules, remote scopes, visa, relocation, job type, language requirements, India fields, canonical-key dedup plus conservative embedding-similarity merging. A 25-job spot check found four bugs, all fixed with tests; a 50-job check is yours to do |
 | 5 | Built | Stage A embeddings + hard filters, Stage B validated LLM assessment, % in code, cached per (job, profile version), unscored + retry, weights re-rank instantly |
 | 6 | Built | Two missed complete listings → expired with reason; deadlines; 45-day stale; daily URL checks of scraped jobs; re-listing reactivates |
 | 7 | Built | Jobs (filters, views, search, sort, cards, drawer, undo, keyboard, new-jobs banner, manual import), Applications (board, table, CSV, follow-up, notes), Sources, Settings, Profile |
@@ -264,7 +264,6 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   and Wellfound (answer crawlers with 403), IIMJobs and Hirist (pages load job data from
   a private API behind bot detection), TimesJobs (broken TLS certificate chain; we don't
   turn off certificate checks).
-- Embedding-similarity dedup (canonical key only so far).
 - Location UI: map view, radius search, timezone overlap.
 - Notifications for new 85%+ matches (the setting is stored, nothing sends yet).
 
@@ -300,7 +299,7 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   whose interval has passed, plus a daily lifecycle/FX pass. No queue, no Redis.
 - 2026-10-25 — Dedup key is normalised company + normalised title (gender markers and
   legal suffixes stripped), without location, so one posting in several cities is one job
-  with several locations. Embedding-similarity dedup is deferred.
+  with several locations.
 - 2026-10-25 — Ambiguous city names resolve only from the posting's country, the
   company's known office countries, or a candidate at least 20× bigger than the next
   (London UK vs London, Ontario). A city whose main name matches beats one that only lists
@@ -358,3 +357,11 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   broken. Adzuna's estimated ("predicted") salaries are dropped, not shown as real.
 - 2026-10-26 — Teamtailor career sites are a company-board platform read from their
   `jobs.rss`; the board's slug is its host (for example `career.teamtailor.com`).
+- 2026-10-26 — Near-duplicates are merged by embedding similarity (≥0.97 cosine) only
+  when the titles have exactly the same words (in any order, ignoring punctuation and
+  filler) at the same company, or the same title at a company whose name extends the
+  other's. Measured on live data, bge-m3 rates unrelated roles at one company up to 0.97
+  and region or segment variants ("Account Executive, Chile" / ", Colombia") at 0.98, so
+  similarity alone is never enough; region variants stay separate jobs because their
+  eligibility differs. The later job gets `duplicate_of` and its sources and locations
+  move to the earlier one; jobs you track or hid are never merged away.

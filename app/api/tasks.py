@@ -36,7 +36,7 @@ async def summary(db: DbDep, runner: TasksDep):
     ).fetchone()
     jobs = db.execute(
         "SELECT COUNT(*) FROM jobs j LEFT JOIN user_job_flags f ON f.job_id = j.id "
-        "WHERE j.status = 'active' AND COALESCE(f.hidden, 0) = 0"
+        "WHERE j.status = 'active' AND j.duplicate_of IS NULL AND COALESCE(f.hidden, 0) = 0"
     ).fetchone()[0]
     apps = db.execute(
         "SELECT COUNT(*) FROM applications WHERE status IN ('applied', 'interviewing', 'offer')"

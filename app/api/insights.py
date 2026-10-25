@@ -24,7 +24,8 @@ async def insights(db: DbDep):
     scored = db.execute(
         "SELECT j.id, j.first_seen_at, ms.final_pct, ms.missing_skills FROM match_scores ms "
         "JOIN jobs j ON j.id = ms.job_id WHERE ms.profile_version_id = ? "
-        "AND ms.status = 'scored' AND j.status = 'active' ORDER BY ms.final_pct DESC",
+        "AND ms.status = 'scored' AND j.status = 'active' AND j.duplicate_of IS NULL "
+        "ORDER BY ms.final_pct DESC",
         (vid,),
     ).fetchall()
     top = scored[:TOP]
@@ -57,7 +58,8 @@ async def insights(db: DbDep):
     salary_rows = db.execute(
         "SELECT COALESCE(l.city, l.country_code) AS place, j.salary_annual_min AS lo, "
         "j.salary_annual_max AS hi FROM jobs j JOIN job_locations l ON l.job_id = j.id "
-        "WHERE j.status = 'active' AND j.salary_annual_max IS NOT NULL AND "
+        "WHERE j.status = 'active' AND j.duplicate_of IS NULL AND j.salary_annual_max IS NOT NULL "
+        "AND "
         "COALESCE(l.city, l.country_code) IS NOT NULL"
     ).fetchall()
     by_place: dict[str, list] = {}

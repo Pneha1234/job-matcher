@@ -245,6 +245,11 @@ MIGRATIONS: list[str] = [
     DROP TABLE applications;
     ALTER TABLE applications_v2 RENAME TO applications;
     """,
+    # 3 — near-duplicate jobs point at the job they were merged into (never deleted)
+    """
+    ALTER TABLE jobs ADD COLUMN duplicate_of INTEGER REFERENCES jobs (id);
+    CREATE INDEX jobs_duplicate_of ON jobs (duplicate_of);
+    """,
 ]
 
 

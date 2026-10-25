@@ -190,7 +190,9 @@ def upsert(conn: sqlite3.Connection, raw: RawJob, norm: Normalised) -> tuple[int
         company_id = row["id"] if row else None
 
     existing = conn.execute(
-        "SELECT id, description, remote_eligibility FROM jobs WHERE canonical_key = ?", (key,)
+        "SELECT COALESCE(d.id, j.id) AS id, COALESCE(d.description, j.description) AS description "
+        "FROM jobs j LEFT JOIN jobs d ON d.id = j.duplicate_of WHERE j.canonical_key = ?",
+        (key,),
     ).fetchone()
     if existing:
         job_id, created = existing["id"], False

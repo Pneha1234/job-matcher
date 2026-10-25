@@ -27,7 +27,9 @@ async def jobs(db: DbDep, flt: Annotated[JobFilters, Query()]):
 @router.get("/jobs/new-count")
 async def new_count(db: DbDep, since: str):
     n = db.execute(
-        "SELECT COUNT(*) FROM jobs WHERE status = 'active' AND first_seen_at > ?", (since,)
+        "SELECT COUNT(*) FROM jobs WHERE status = 'active' AND duplicate_of IS NULL "
+        "AND first_seen_at > ?",
+        (since,),
     ).fetchone()[0]
     return {"count": n}
 

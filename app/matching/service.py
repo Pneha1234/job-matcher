@@ -14,6 +14,7 @@ from app.matching.score import (
     final_pct,
     sub_scores,
 )
+from app.normalize.dedup import merge_near_duplicates
 from app.profile import store
 from app.profile.schema import ProfileData
 from app.settings_store import AppSettings, Weights
@@ -32,10 +33,12 @@ def job_text(row: sqlite3.Row) -> str:
 
 async def embed_missing(
     conn: sqlite3.Connection, ollama: OllamaClient, ctx: TaskContext | None = None, step=0
-) -> int:
+) -> list[int]:
+    """Embed active jobs that have no vector yet; returns their ids."""
     rows = conn.execute(
         "SELECT id, title, company_name, description FROM jobs WHERE status = 'active' "
-        "AND id NOT IN (SELECT job_id FROM job_embeddings) ORDER BY id DESC"
+        "AND duplicate_of IS NULL AND id NOT IN (SELECT job_id FROM job_embeddings) "
+        "ORDER BY id DESC"
     ).fetchall()
     done = 0
     for i in range(0, len(rows), EMBED_BATCH):
@@ -50,7 +53,7 @@ async def embed_missing(
         done += len(batch)
         if ctx:
             ctx.step(step, "running", f"{done:,} / {len(rows):,}")
-    return done
+    return [r["id"] for r in rows]
 
 
 async def profile_vector(
@@ -111,7 +114,7 @@ def shortlist(
     picked = []
     for job_id in ids:
         job = rows.get(job_id)
-        if not job or job["status"] != "active" or job["hidden"]:
+        if not job or job["status"] != "active" or job["hidden"] or job["duplicate_of"]:
             continue
         if settings.job_types and job["job_type"] and job["job_type"] not in settings.job_types:
             continue
@@ -246,7 +249,8 @@ async def run_scoring(
     version_id, profile = active
     ctx.step(0)
     embedded = await embed_missing(conn, ollama, ctx, 0)
-    ctx.step(0, "done", f"{embedded:,} new")
+    merged = merge_near_duplicates(conn, embedded)
+    ctx.step(0, "done", f"{len(embedded):,} new, {merged} near-duplicates merged")
     ctx.step(1)
     # Read after embedding, which can take minutes: preferences saved meanwhile apply.
     settings = load_settings(conn)

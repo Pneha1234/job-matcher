@@ -57,6 +57,7 @@ def where_clause(flt: JobFilters, settings: AppSettings) -> tuple[str, dict]:
     args: dict = {}
     statuses = ["'active'"] + (["'expired'", "'stale'"] if flt.show_expired else [])
     clauses.append(f"j.status IN ({', '.join(statuses)})")
+    clauses.append("j.duplicate_of IS NULL")
     if not flt.show_hidden:
         clauses.append("COALESCE(f.hidden, 0) = 0")
     if flt.min_match:
