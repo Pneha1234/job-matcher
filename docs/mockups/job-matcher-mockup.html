@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Matcher</title>
+<style>
+:root{
+  --bg:#f6f7f9;--panel:#ffffff;--panel-2:#f1f3f6;--text:#14171c;--text-2:#5b6472;--text-3:#8a93a1;
+  --border:#e3e6eb;--border-2:#cfd4dc;--accent:#4f46e5;--accent-bg:#eef0ff;--accent-text:#3730a3;
+  --ok:#15803d;--ok-bg:#e8f6ec;--warn:#a16207;--warn-bg:#fdf4dc;--bad:#b91c1c;--bad-bg:#fdecec;
+  --radius:10px;--shadow:0 8px 30px rgba(15,23,42,.12);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1115;--panel:#171a21;--panel-2:#1f232c;--text:#e8eaee;--text-2:#a3abb8;--text-3:#717a88;
+  --border:#2a2f3a;--border-2:#3a404d;--accent:#8b85ff;--accent-bg:#25234a;--accent-text:#c7c4ff;
+  --ok:#5fd38a;--ok-bg:#16301f;--warn:#e7b84a;--warn-bg:#33290f;--bad:#f27b7b;--bad-bg:#3a1a1a;--shadow:0 8px 30px rgba(0,0,0,.5);}}
+:root[data-theme="dark"]{
+  --bg:#0f1115;--panel:#171a21;--panel-2:#1f232c;--text:#e8eaee;--text-2:#a3abb8;--text-3:#717a88;
+  --border:#2a2f3a;--border-2:#3a404d;--accent:#8b85ff;--accent-bg:#25234a;--accent-text:#c7c4ff;
+  --ok:#5fd38a;--ok-bg:#16301f;--warn:#e7b84a;--warn-bg:#33290f;--bad:#f27b7b;--bad-bg:#3a1a1a;--shadow:0 8px 30px rgba(0,0,0,.5);}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif}
+button,input,select{font:inherit;color:inherit}
+button{background:var(--panel);border:1px solid var(--border-2);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:hover{background:var(--panel-2)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.primary:hover{filter:brightness(1.08)}
+button.ghost{border-color:transparent;background:transparent}
+input[type=text],input[type=number],select{background:var(--panel);border:1px solid var(--border-2);border-radius:8px;padding:7px 10px;min-width:0}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+input[type=range]{accent-color:var(--accent);width:100%}
+input[type=checkbox]{accent-color:var(--accent)}
+.app{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
+.side{background:var(--panel);border-right:1px solid var(--border);padding:16px 12px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:16px;padding:4px 8px 16px}
+.logo{width:30px;height:30px;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700}
+.nav{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;color:var(--text-2);cursor:pointer;border:0;background:none;text-align:left;width:100%}
+.nav:hover{background:var(--panel-2)}
+.nav.on{background:var(--accent-bg);color:var(--accent-text);font-weight:600}
+.nav .count{margin-left:auto;font-size:12px;background:var(--panel-2);color:var(--text-2);border-radius:20px;padding:0 8px}
+.nav.on .count{background:var(--panel)}
+.side-foot{margin-top:auto;font-size:12px;color:var(--text-3);padding:8px;border-top:1px solid var(--border)}
+.dotlive{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);margin-right:6px}
+main{padding:20px 28px 60px;min-width:0}
+.top{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.top h1{font-size:22px;margin:0;font-weight:600}
+.top .sp{flex:1}
+.muted{color:var(--text-2)}.faint{color:var(--text-3)}.small{font-size:12px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:2px 8px;border-radius:6px;background:var(--panel-2);color:var(--text-2);white-space:nowrap}
+.chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.bad{background:var(--bad-bg);color:var(--bad)}
+.chip.warn{background:var(--warn-bg);color:var(--warn)}.chip.acc{background:var(--accent-bg);color:var(--accent-text)}
+.chip .x{cursor:pointer;opacity:.7;border:0;background:none;padding:0 0 0 2px}
+.page{display:none}.page.on{display:block}
+.banner{display:flex;align-items:center;gap:10px;background:var(--accent-bg);color:var(--accent-text);padding:8px 12px;border-radius:10px;margin-bottom:12px;cursor:pointer}
+/* jobs */
+.jobs-layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:20px}
+.filters{position:sticky;top:20px;align-self:start;display:flex;flex-direction:column;gap:16px}
+.fgroup h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-3);font-weight:600}
+.fgroup label{display:flex;align-items:center;gap:8px;padding:2px 0;cursor:pointer}
+.seg{display:flex;border:1px solid var(--border-2);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;flex:1;padding:5px 0;font-size:13px}
+.seg button.on{background:var(--accent);color:#fff}
+.views{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.views button{border-radius:20px;font-size:13px;padding:4px 12px}
+.views button.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+.toolbar{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.job{display:flex;gap:14px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;transition:border-color .12s}
+.job:hover{border-color:var(--border-2)}
+.job.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.job.expired{opacity:.6}
+.score{flex:none;width:58px;height:58px;border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:17px}
+.s-hi{background:var(--ok-bg);color:var(--ok)}.s-mid{background:var(--warn-bg);color:var(--warn)}.s-lo{background:var(--panel-2);color:var(--text-2)}
+.job .title{font-weight:600;font-size:15px}
+.job .row{display:flex;flex-wrap:wrap;gap:4px 12px;color:var(--text-2);font-size:13px}
+.job .skills{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.job .acts{display:flex;flex-direction:column;gap:6px;margin-left:auto;flex:none}
+.job .acts button{font-size:12px;padding:4px 10px}
+.empty{text-align:center;padding:40px 20px;color:var(--text-2)}
+.kbd{font-family:ui-monospace,Menlo,monospace;font-size:11px;border:1px solid var(--border-2);border-bottom-width:2px;border-radius:4px;padding:0 4px;color:var(--text-2)}
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(10,12,16,.35);display:none;z-index:20}
+.drawer{position:fixed;top:0;right:0;height:100vh;width:min(560px,100vw);background:var(--panel);border-left:1px solid var(--border);box-shadow:var(--shadow);transform:translateX(100%);transition:transform .2s ease;z-index:21;overflow:auto;padding:22px}
+.drawer.open{transform:none}.scrim.open{display:block}
+.bars .b{display:grid;grid-template-columns:150px 1fr 34px;gap:10px;align-items:center;margin:7px 0;font-size:13px}
+.track{height:8px;background:var(--panel-2);border-radius:4px;overflow:hidden}
+.track span{display:block;height:100%;background:var(--accent);border-radius:4px}
+.desc{white-space:pre-line;color:var(--text-2);font-size:13px;border-top:1px solid var(--border);margin-top:16px;padding-top:14px}
+/* board */
+.board{display:grid;grid-template-columns:repeat(5,minmax(200px,1fr));gap:12px;overflow-x:auto;padding-bottom:8px}
+.col{background:var(--panel-2);border-radius:12px;padding:10px;min-height:340px}
+.col.over{outline:2px dashed var(--accent);outline-offset:-4px}
+.col h3{margin:2px 4px 10px;font-size:13px;display:flex;justify-content:space-between;font-weight:600}
+.kc{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;cursor:grab}
+.kc:active{cursor:grabbing}
+.kc .t{font-weight:600;font-size:13px}
+/* insights */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px}
+.stat{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px}
+.stat .v{font-size:24px;font-weight:700}
+.hbar{display:grid;grid-template-columns:110px 1fr 44px;gap:10px;align-items:center;margin:8px 0;font-size:13px}
+.funnel .f{height:30px;border-radius:6px;background:var(--accent);color:#fff;display:flex;align-items:center;padding:0 10px;font-size:13px;margin:6px 0;white-space:nowrap}
+/* table */
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px}
+th{color:var(--text-3);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+.tablewrap{overflow-x:auto}
+/* profile */
+.steps{display:flex;gap:22px;flex-wrap:wrap;margin-bottom:18px}
+.st{display:flex;align-items:center;gap:8px;color:var(--text-3);font-size:13px}
+.st .n{width:24px;height:24px;border-radius:50%;border:1px solid var(--border-2);display:grid;place-items:center;font-size:12px}
+.st.on{color:var(--text);font-weight:600}.st.on .n{border-color:var(--accent);color:var(--accent)}
+.st.done{color:var(--ok)}.st.done .n{background:var(--ok-bg);border-color:var(--ok)}
+.drop{border:2px dashed var(--border-2);border-radius:12px;padding:30px;text-align:center;cursor:pointer;display:block}
+.drop.over{border-color:var(--accent);background:var(--accent-bg)}
+.err{color:var(--bad);font-size:12px;min-height:16px;margin-top:4px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12px;color:var(--text-2)}
+.prog div{display:flex;gap:8px;align-items:center;margin:6px 0}
+/* toast */
+.toast{position:fixed;left:50%;bottom:22px;transform:translate(-50%,120px);background:var(--text);color:var(--bg);padding:10px 14px;border-radius:10px;display:flex;gap:14px;align-items:center;transition:transform .2s;z-index:30;box-shadow:var(--shadow)}
+.toast.show{transform:translate(-50%,0)}
+.toast button{background:transparent;border:0;color:var(--accent);font-weight:600;padding:0}
+:root[data-theme="dark"] .toast button,:root:not([data-theme="light"]) .toast button{color:var(--accent)}
+.spark{vertical-align:middle}
+@media (max-width:900px){
+  .app{grid-template-columns:1fr}
+  .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;border-right:0;border-bottom:1px solid var(--border);padding:10px 16px}
+  .brand{padding:4px 8px}.side-foot{display:none}
+  .nav{width:auto}.nav .count{display:none}
+  main{padding:16px}
+  .jobs-layout{grid-template-columns:1fr}
+  .filters{position:static;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .job .acts{display:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo">J</div>Job matcher</div>
+    <button class="nav on" data-page="jobs">Jobs <span class="count" id="nc-jobs"></span></button>
+    <button class="nav" data-page="apps">Applications <span class="count" id="nc-apps"></span></button>
+    <button class="nav" data-page="insights">Insights</button>
+    <button class="nav" data-page="sources">Sources <span class="count" id="nc-src"></span></button>
+    <button class="nav" data-page="profile">Profile</button>
+    <button class="nav" data-page="settings">Settings</button>
+    <div class="side-foot">
+      <div><span class="dotlive"></span>Ollama · qwen2.5:14b</div>
+      <div>Last scrape 18 min ago</div>
+      <div style="margin-top:8px"><button class="ghost small" id="theme" style="padding:2px 0">Toggle dark mode</button></div>
+    </div>
+  </aside>
+
+  <main>
+    <!-- JOBS -->
+    <section class="page on" id="p-jobs">
+      <div class="top">
+        <h1>Jobs</h1><span class="chip acc" id="newcount"></span><div class="sp"></div>
+        <span class="faint small">Scored against <b>Profile v3</b></span>
+      </div>
+      <div class="banner" id="newbanner">New jobs found since you opened this page. Show them</div>
+      <div class="jobs-layout">
+        <div class="filters">
+          <div class="fgroup"><h4>Min match <span id="minv" style="float:right;color:var(--text)"></span></h4><input type="range" id="f-min" min="0" max="100" step="5" value="60"></div>
+          <div class="fgroup"><h4>Location</h4>
+            <label><input type="checkbox" class="f-loc" value="Amsterdam" checked> Amsterdam</label>
+            <label><input type="checkbox" class="f-loc" value="Rotterdam" checked> Rotterdam</label>
+            <label><input type="checkbox" class="f-loc" value="Remote EU" checked> Remote (EU)</label>
+            <label><input type="checkbox" class="f-loc" value="Remote worldwide" checked> Remote (worldwide)</label>
+            <label><input type="checkbox" class="f-loc" value="Remote US"> Remote (US only)</label>
+            <label><input type="checkbox" class="f-loc" value="Berlin"> Berlin</label>
+          </div>
+          <div class="fgroup"><h4>Job type</h4>
+            <label><input type="checkbox" class="f-type" value="Full-time" checked> Full-time</label>
+            <label><input type="checkbox" class="f-type" value="Contract" checked> Contract</label>
+            <label><input type="checkbox" class="f-type" value="Part-time"> Part-time</label>
+          </div>
+          <div class="fgroup"><h4>Salary</h4>
+            <label><input type="checkbox" id="f-sal"> Only jobs that show salary</label>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:6px"><span class="muted small">Min €</span><input type="number" id="f-salmin" placeholder="60000" step="5000" style="width:100%"></div>
+          </div>
+          <div class="fgroup"><h4>Posted</h4>
+            <div class="seg" id="f-posted"><button data-v="1">24h</button><button data-v="7">7d</button><button data-v="30" class="on">30d</button></div>
+          </div>
+          <div class="fgroup"><h4>Status</h4>
+            <label><input type="checkbox" id="f-hideapplied"> Hide applied</label>
+            <label><input type="checkbox" id="f-expired"> Show expired</label>
+            <label><input type="checkbox" id="f-hidden"> Show hidden</label>
+          </div>
+          <button id="f-reset">Reset filters</button>
+        </div>
+
+        <div>
+          <div class="views" id="views">
+            <button class="on" data-view="all">All</button>
+            <button data-view="top">80%+ not applied</button>
+            <button data-view="new">New today</button>
+            <button data-view="remote">Remote EU</button>
+            <button data-view="contract">Contract</button>
+          </div>
+          <div class="toolbar">
+            <input type="text" id="q" placeholder="Search title, company or skill" style="flex:1;min-width:180px">
+            <select id="sort"><option value="match">Best match</option><option value="new">Newest</option><option value="salary">Highest salary</option></select>
+            <span class="faint small" id="resultcount"></span>
+          </div>
+          <div id="joblist"></div>
+          <div class="faint small" style="margin-top:8px">Keyboard: <span class="kbd">j</span>/<span class="kbd">k</span> move · <span class="kbd">Enter</span> open · <span class="kbd">s</span> save · <span class="kbd">a</span> applied · <span class="kbd">x</span> hide · <span class="kbd">Esc</span> close</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- APPLICATIONS -->
+    <section class="page" id="p-apps">
+      <div class="top"><h1>Applications</h1><div class="sp"></div><span class="faint small">Drag cards between stages</span></div>
+      <div class="board" id="board"></div>
+    </section>
+
+    <!-- INSIGHTS -->
+    <section class="page" id="p-insights">
+      <div class="top"><h1>Insights</h1><div class="sp"></div><span class="faint small">Based on your top 200 active matches</span></div>
+      <div class="stats" id="stats"></div>
+      <div class="grid2">
+        <div class="card"><b>Skills you're missing most often</b><div class="muted small" style="margin-bottom:8px">Share of top matches that ask for it</div><div id="gaps"></div></div>
+        <div class="card"><b>Your funnel</b><div class="muted small" style="margin-bottom:8px">Last 30 days</div><div class="funnel" id="funnel"></div></div>
+        <div class="card"><b>New matching jobs per day</b><div class="muted small">80%+ match, last 14 days</div><div id="perday"></div></div>
+        <div class="card"><b>Salary range by location</b><div class="muted small" style="margin-bottom:8px">Jobs that show salary, annual €</div><div id="salloc"></div></div>
+      </div>
+    </section>
+
+    <!-- SOURCES -->
+    <section class="page" id="p-sources">
+      <div class="top"><h1>Sources</h1><div class="sp"></div><button id="runall">Run all now</button></div>
+      <div class="card tablewrap" style="padding:0"><table><thead><tr><th>Source</th><th>Status</th><th>Last run</th><th>Found</th><th>New</th><th>Last 7 runs</th><th></th></tr></thead><tbody id="srcrows"></tbody></table></div>
+      <p class="faint small">A source that suddenly returns 0 jobs usually means the site changed and its scraper needs fixing.</p>
+    </section>
+
+    <!-- PROFILE -->
+    <section class="page" id="p-profile">
+      <div class="top"><h1>Profile</h1><div class="sp"></div><select id="pver"><option>Profile v3 · Oct 18 (active)</option><option>Profile v2 · Sep 30</option><option>Profile v1 · Sep 12</option></select></div>
+      <div class="steps"><div class="st on" id="st1"><span class="n">1</span>Resume and links</div><div class="st" id="st2"><span class="n">2</span>Review profile</div><div class="st" id="st3"><span class="n">3</span>Preferences</div></div>
+
+      <div id="pstage1" style="max-width:720px">
+        <div class="card" style="margin-bottom:14px">
+          <b>Your resume</b>
+          <label class="drop" id="drop" for="file" style="margin-top:10px">
+            <div style="font-size:28px">&#8679;</div>
+            <div>Drop your resume here or <span style="color:var(--accent)">browse</span></div>
+            <div class="faint small">PDF or DOCX, up to 10 MB. It stays on this computer.</div>
+          </label>
+          <input type="file" id="file" accept=".pdf,.docx" hidden>
+          <div id="filerow" style="display:none;align-items:center;gap:10px;margin-top:10px;background:var(--panel-2);padding:10px;border-radius:8px">
+            <span style="font-size:20px">&#128196;</span><div style="flex:1"><div id="fname" style="font-weight:600"></div><div class="faint small" id="fsize"></div></div><button id="frm" class="ghost" aria-label="Remove file">&#10005;</button>
+          </div>
+          <div class="err" id="ferr"></div>
+        </div>
+        <div class="card" style="margin-bottom:14px">
+          <b>Profile links</b><div class="muted small">Optional. These add evidence for your skills.</div>
+          <div class="field" style="margin-top:10px"><label>GitHub</label><input type="text" id="gh" placeholder="github.com/yourname"><div class="err" id="gherr"></div></div>
+          <div class="field"><label>Portfolio</label><input type="text" id="pf" placeholder="yourname.dev"><div class="err" id="pferr"></div></div>
+          <div class="field"><label>LinkedIn</label><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button id="li">Upload LinkedIn export (.zip)</button><span class="faint small" id="lis">LinkedIn → Settings → Data privacy → Get a copy of your data</span></div></div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button id="sample">Use sample resume</button><button class="primary" id="readp">Read my profile →</button></div>
+      </div>
+      <div id="pstage2" style="display:none;max-width:720px"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="page" id="p-settings">
+      <div class="top"><h1>Settings</h1></div>
+      <div class="grid2">
+        <div class="card">
+          <b>Match weights</b><div class="muted small" style="margin-bottom:10px">How much each part counts toward the match %. Changes re-rank your jobs right away.</div>
+          <div id="weights"></div>
+          <div class="muted small" id="wsum" style="margin-top:6px"></div>
+          <button id="wreset" style="margin-top:10px">Reset to defaults</button>
+        </div>
+        <div class="card">
+          <b>Top 5 with these weights</b><div class="muted small" style="margin-bottom:8px">Live preview</div><div id="preview"></div>
+        </div>
+        <div class="card">
+          <b>Saved searches</b><div class="muted small" style="margin-bottom:8px">What the scrapers look for</div>
+          <div id="searches"></div>
+          <div style="display:flex;gap:8px;margin-top:10px"><input type="text" id="newsearch" placeholder="Django developer · Utrecht" style="flex:1"><button id="addsearch">Add</button></div>
+          <div class="err" id="searcherr"></div>
+        </div>
+        <div class="card">
+          <b>Schedule and model</b>
+          <div class="field" style="margin-top:10px"><label>Job boards (LinkedIn, Indeed, Glassdoor, Google)</label><select><option>Every 6 hours</option><option>Every 12 hours</option><option>Daily</option></select></div>
+          <div class="field" style="margin-top:8px"><label>Company job boards (Greenhouse, Lever, Ashby, Workday)</label><select><option>Every 12 hours</option><option>Daily</option></select></div>
+          <div class="field" style="margin-top:8px"><label>Scoring model</label><select><option>qwen2.5:14b (better, slower)</option><option>llama3.1:8b (faster)</option></select></div>
+          <div class="field" style="margin-top:8px"><label>Currency</label><select><option>EUR</option><option>USD</option><option>GBP</option><option>INR</option></select></div>
+          <label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" checked> Notify me about new 85%+ matches</label>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Job details"></aside>
+<div class="toast" id="toast"><span id="toastmsg"></span><button id="undo">Undo</button></div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const W0={req:50,nice:15,sen:15,dom:10,loc:10};
+let W={...W0};
+const WL={req:"Required skills",nice:"Nice to have",sen:"Seniority",dom:"Domain",loc:"Location and language"};
+
+const jobs=[
+ {id:1,t:"Senior Backend Engineer",c:"Mollie",loc:"Amsterdam",mode:"Hybrid · 3 days",type:"Full-time",smin:75000,smax:95000,sal:"€75k–95k",d:2,src:["LinkedIn","Greenhouse","Indeed"],s:{req:92,nice:67,sen:100,dom:85,loc:100},ok:["Python","Django","PostgreSQL","Celery","Docker"],miss:["Kubernetes"],why:"Strong Django and PostgreSQL match, backed by 14 GitHub repos. Fintech experience fits their payments domain. Kubernetes is the one missing must-have.",st:"saved",exp:false,hid:false},
+ {id:2,t:"Python Developer",c:"Adyen",loc:"Remote EU",mode:"Remote (EU)",type:"Full-time",smin:null,smax:null,sal:"",d:1,src:["Greenhouse"],s:{req:88,nice:70,sen:90,dom:80,loc:100},ok:["Python","REST APIs","Docker","PostgreSQL"],miss:["Java"],why:"Python and API work line up well. Java is listed as nice to have, not required.",st:"none",exp:false,hid:false},
+ {id:3,t:"Django Contractor (6 months)",c:"Bol",loc:"Amsterdam",mode:"Onsite",type:"Contract",smin:150000,smax:170000,sal:"€85/hr",d:0,src:["Indeed"],s:{req:96,nice:60,sen:80,dom:70,loc:40},ok:["Django","DRF","PostgreSQL"],miss:["Dutch (spoken)"],why:"The stack is almost an exact match, but the posting requires spoken Dutch, which pulls the location and language score down.",st:"none",exp:false,hid:false},
+ {id:4,t:"Platform Engineer",c:"Picnic",loc:"Amsterdam",mode:"Hybrid",type:"Full-time",smin:70000,smax:85000,sal:"€70k–85k",d:3,src:["Lever"],s:{req:60,nice:50,sen:90,dom:60,loc:100},ok:["Python","AWS"],miss:["Terraform","Kubernetes"],why:"Python fits, but the role leans on infrastructure tooling you haven't used much.",st:"applied",appliedDays:16,exp:false,hid:false},
+ {id:5,t:"Full-stack Engineer",c:"Remote.com",loc:"Remote worldwide",mode:"Remote (worldwide)",type:"Full-time",smin:85000,smax:110000,sal:"$90k–120k",d:6,src:["Ashby"],s:{req:55,nice:60,sen:80,dom:50,loc:100},ok:["Python","React"],miss:["Elixir"],why:"Good front-end and Python overlap, but their core backend is Elixir.",st:"none",exp:false,hid:false},
+ {id:6,t:"Backend Engineer, Payments",c:"Booking.com",loc:"Amsterdam",mode:"Hybrid",type:"Full-time",smin:80000,smax:100000,sal:"€80k–100k",d:9,src:["LinkedIn","Workday"],s:{req:84,nice:72,sen:100,dom:90,loc:100},ok:["Python","PostgreSQL","Celery","Kafka"],miss:["Go"],why:"Payments domain and Python services match well. Some Go services in the team.",st:"interviewing",exp:false,hid:false},
+ {id:7,t:"Senior Python Engineer",c:"Elastic",loc:"Remote EU",mode:"Remote (EU)",type:"Full-time",smin:90000,smax:115000,sal:"€90k–115k",d:0,src:["Greenhouse","LinkedIn"],s:{req:85,nice:80,sen:100,dom:60,loc:100},ok:["Python","Docker","AWS","PostgreSQL"],miss:["Elasticsearch"],why:"Senior Python role with a strong overlap. Elasticsearch internals experience is preferred.",st:"none",exp:false,hid:false},
+ {id:8,t:"Backend Developer",c:"Coolblue",loc:"Rotterdam",mode:"Hybrid",type:"Full-time",smin:60000,smax:75000,sal:"€60k–75k",d:4,src:["Indeed","Nationale Vacaturebank"],s:{req:75,nice:55,sen:70,dom:60,loc:60},ok:["Python","PostgreSQL"],miss:["C#","Dutch (spoken)"],why:"Mixed Python and C# backend. Dutch is required for team meetings.",st:"none",exp:false,hid:false},
+ {id:9,t:"Staff Engineer, Data Platform",c:"Spotify",loc:"Remote US",mode:"Remote (US only)",type:"Full-time",smin:180000,smax:220000,sal:"$190k–230k",d:2,src:["LinkedIn"],s:{req:70,nice:60,sen:60,dom:50,loc:0},ok:["Python","Celery"],miss:["Scala","Spark"],why:"Remote is limited to the US, so the location score is zero.",st:"none",exp:false,hid:false},
+ {id:10,t:"Django Developer",c:"Catawiki",loc:"Amsterdam",mode:"Hybrid",type:"Full-time",smin:null,smax:null,sal:"",d:21,src:["Lever"],s:{req:90,nice:70,sen:80,dom:70,loc:100},ok:["Django","PostgreSQL","Celery"],miss:[],why:"Close match on the stack. This posting was removed from their job board.",st:"none",exp:true,expWhy:"Removed from Lever on Oct 19",hid:false},
+ {id:11,t:"Software Engineer, Integrations",c:"Personio",loc:"Berlin",mode:"Hybrid",type:"Full-time",smin:70000,smax:90000,sal:"€70k–90k",d:5,src:["Ashby"],s:{req:80,nice:65,sen:90,dom:95,loc:60},ok:["Python","REST APIs","PostgreSQL"],miss:["TypeScript"],why:"HR tech domain matches your background closely. Berlin hybrid needs relocation.",st:"none",exp:false,hid:false},
+ {id:12,t:"Freelance Python API Developer",c:"Toptal client",loc:"Remote EU",mode:"Remote (EU)",type:"Contract",smin:null,smax:null,sal:"",d:0,src:["Google Jobs"],s:{req:82,nice:50,sen:80,dom:40,loc:100},ok:["Python","FastAPI","PostgreSQL"],miss:[],why:"Good API match. Client and domain aren't disclosed.",st:"none",exp:false,hid:false},
+ {id:13,t:"Backend Engineer",c:"Ohpen",loc:"Amsterdam",mode:"Hybrid",type:"Full-time",smin:65000,smax:80000,sal:"€65k–80k",d:30,src:["LinkedIn"],s:{req:78,nice:60,sen:90,dom:90,loc:100},ok:["Python","AWS","PostgreSQL"],miss:["Kotlin"],why:"Banking domain fits. The listing returned 404 on the last check.",st:"applied",appliedDays:30,exp:true,expWhy:"Listing returned 404 on Oct 20",hid:false},
+ {id:14,t:"Part-time Python Mentor",c:"Codaisseur",loc:"Remote EU",mode:"Remote (EU)",type:"Part-time",smin:null,smax:null,sal:"",d:8,src:["Arbeitnow"],s:{req:70,nice:40,sen:60,dom:30,loc:100},ok:["Python","Django"],miss:[],why:"Teaching role. Skills match, domain doesn't.",st:"rejected",exp:false,hid:false},
+];
+const match=j=>{const tw=Object.values(W).reduce((a,b)=>a+b,0)||1;return Math.round(Object.keys(W).reduce((a,k)=>a+j.s[k]*W[k],0)/tw)};
+const cls=m=>m>=80?"s-hi":m>=60?"s-mid":"s-lo";
+const stName={none:"",saved:"Saved",applied:"Applied",interviewing:"Interviewing",offer:"Offer",rejected:"Rejected"};
+
+let F={min:60,locs:null,types:null,sal:false,salmin:null,posted:30,hideApplied:false,expired:false,hidden:false,q:"",sort:"match",view:"all"};
+let selId=null, lastList=[];
+
+function readFilters(){
+  F.min=+$('#f-min').value; $('#minv').textContent=F.min+"%";
+  F.locs=$$('.f-loc').filter(x=>x.checked).map(x=>x.value);
+  F.types=$$('.f-type').filter(x=>x.checked).map(x=>x.value);
+  F.sal=$('#f-sal').checked; F.salmin=+$('#f-salmin').value||null;
+  F.hideApplied=$('#f-hideapplied').checked; F.expired=$('#f-expired').checked; F.hidden=$('#f-hidden').checked;
+  F.q=$('#q').value.trim().toLowerCase(); F.sort=$('#sort').value;
+}
+function filtered(){
+  let r=jobs.filter(j=>{
+    const m=match(j);
+    if(m<F.min) return false;
+    if(!F.locs.includes(j.loc)) return false;
+    if(!F.types.includes(j.type)) return false;
+    if(F.sal && !j.sal) return false;
+    if(F.salmin && (!j.smax || j.smax<F.salmin)) return false;
+    if(j.d>F.posted) return false;
+    if(F.hideApplied && ["applied","interviewing","offer","rejected"].includes(j.st)) return false;
+    if(j.exp && !F.expired) return false;
+    if(j.hid && !F.hidden) return false;
+    if(F.q && !(j.t+" "+j.c+" "+j.ok.join(" ")+" "+j.miss.join(" ")).toLowerCase().includes(F.q)) return false;
+    if(F.view==="top" && (m<80 || j.st!=="none" && j.st!=="saved")) return false;
+    if(F.view==="new" && j.d>0) return false;
+    if(F.view==="remote" && j.loc!=="Remote EU") return false;
+    if(F.view==="contract" && j.type!=="Contract") return false;
+    return true;
+  });
+  r.sort(F.sort==="new"?(a,b)=>a.d-b.d:F.sort==="salary"?(a,b)=>(b.smax||0)-(a.smax||0):(a,b)=>match(b)-match(a));
+  return r;
+}
+const ago=d=>d===0?"Today":d===1?"Yesterday":d+" days ago";
+function renderJobs(){
+  readFilters();
+  const list=filtered(); lastList=list;
+  $('#resultcount').textContent=list.length+" jobs";
+  $('#newcount').textContent=jobs.filter(j=>j.d===0&&!j.exp).length+" new today";
+  $('#nc-jobs').textContent=jobs.filter(j=>!j.exp&&!j.hid).length;
+  if(!list.length){
+    $('#joblist').innerHTML=`<div class="card empty"><div style="font-size:16px;font-weight:600;color:var(--text)">No jobs match these filters</div><p>Try a lower match threshold or a wider posted window.</p><button id="loosen">Lower min match to 50% and show 30 days</button></div>`;
+    $('#loosen').onclick=()=>{$('#f-min').value=50;setPosted(30);selectView('all');renderJobs()};
+    return;
+  }
+  $('#joblist').innerHTML=list.map(j=>{const m=match(j);return `
+  <div class="job ${j.id===selId?'sel':''} ${j.exp?'expired':''}" data-id="${j.id}">
+    <div class="score ${cls(m)}">${m}%</div>
+    <div style="min-width:0;flex:1">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="title">${j.t}</span>
+        ${j.st!=="none"?`<span class="chip acc">${stName[j.st]}</span>`:""}${j.exp?`<span class="chip bad">Expired</span>`:""}${j.hid?`<span class="chip">Hidden</span>`:""}${j.d===0&&!j.exp?`<span class="chip ok">New</span>`:""}</div>
+      <div class="row"><span><b style="color:var(--text)">${j.c}</b></span><span>${j.mode}</span><span>${j.type}</span></div>
+      <div class="row"><span>${j.sal||'<span class="faint">Salary not shown</span>'}</span><span>${ago(j.d)}</span><span>${j.src[0]}${j.src.length>1?" +"+(j.src.length-1):""}</span></div>
+      <div class="skills">${j.ok.slice(0,4).map(s=>`<span class="chip ok">✓ ${s}</span>`).join("")}${j.miss.map(s=>`<span class="chip bad">✕ ${s}</span>`).join("")}</div>
+    </div>
+    <div class="acts">
+      <button data-act="save">${j.st==="saved"?"★ Saved":"☆ Save"}</button>
+      <button data-act="apply" class="${j.st==="none"||j.st==="saved"?"primary":""}">${j.st==="none"||j.st==="saved"?"Mark applied":stName[j.st]}</button>
+      <button data-act="hide" class="ghost">${j.hid?"Unhide":"Hide"}</button>
+    </div>
+  </div>`}).join("");
+  $$('.job').forEach(el=>{
+    el.onclick=e=>{const id=+el.dataset.id;const a=e.target.closest('button');if(a){e.stopPropagation();act(id,a.dataset.act);return}selId=id;openDrawer(id)};
+  });
+}
+function act(id,a){
+  const j=jobs.find(x=>x.id===id); const prev={st:j.st,hid:j.hid,appliedDays:j.appliedDays};
+  if(a==="save"){j.st=j.st==="saved"?"none":"saved";toast(j.st==="saved"?`Saved ${j.c}`:`Removed ${j.c} from saved`,j,prev)}
+  if(a==="apply"){if(j.st==="none"||j.st==="saved"){j.st="applied";j.appliedDays=0;toast(`Marked ${j.c} as applied today`,j,prev)}else{showPage('apps');return}}
+  if(a==="hide"){j.hid=!j.hid;toast(j.hid?`Hidden ${j.c}`:`Unhid ${j.c}`,j,prev)}
+  renderAll(); if($('#drawer').classList.contains('open')) openDrawer(id);
+}
+let undoFn=null,tt;
+function toast(msg,j,prev){
+  $('#toastmsg').textContent=msg; $('#toast').classList.add('show');
+  undoFn=j?()=>{Object.assign(j,prev);renderAll();if($('#drawer').classList.contains('open'))openDrawer(j.id)}:null;
+  $('#undo').style.display=undoFn?"":"none";
+  clearTimeout(tt); tt=setTimeout(()=>$('#toast').classList.remove('show'),4000);
+}
+$('#undo').onclick=()=>{undoFn&&undoFn();$('#toast').classList.remove('show')};
+
+function openDrawer(id){
+  const j=jobs.find(x=>x.id===id); if(!j) return; const m=match(j);
+  $('#drawer').innerHTML=`
+   <div style="display:flex;justify-content:space-between;gap:10px"><div><div style="font-size:19px;font-weight:700">${j.t}</div><div class="muted">${j.c} · ${j.mode} · ${j.type}</div></div><button class="ghost" id="dclose" aria-label="Close">✕</button></div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
+     <span class="chip">${j.sal||"Salary not shown"}</span><span class="chip">Posted ${ago(j.d).toLowerCase()}</span>
+     ${j.exp?`<span class="chip bad">Expired · ${j.expWhy}</span>`:`<span class="chip ok">Active · last seen 3h ago</span>`}
+     ${j.st!=="none"?`<span class="chip acc">${stName[j.st]}</span>`:""}
+   </div>
+   <div class="card" style="background:var(--panel-2);border:0">
+     <div style="display:flex;align-items:center;gap:14px;margin-bottom:6px"><div class="score ${cls(m)}">${m}%</div><div><b>Match breakdown</b><div class="muted small">Weighted by your settings · Profile v3</div></div></div>
+     <div class="bars">${Object.keys(W).map(k=>`<div class="b"><span class="muted">${WL[k]} <span class="faint">(${W[k]})</span></span><div class="track"><span style="width:${j.s[k]}%"></span></div><span style="text-align:right">${j.s[k]}</span></div>`).join("")}</div>
+     <p style="margin:10px 0 0">${j.why}</p>
+   </div>
+   <div style="margin-top:14px"><div class="muted small">Matched</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin:4px 0 10px">${j.ok.map(s=>`<span class="chip ok">✓ ${s}</span>`).join("")}</div>
+   <div class="muted small">Missing</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">${j.miss.length?j.miss.map(s=>`<span class="chip bad">✕ ${s}</span>`).join(""):'<span class="faint small">Nothing missing</span>'}</div></div>
+   <div style="margin-top:14px"><div class="muted small">Found on</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">${j.src.map(s=>`<a href="#" class="chip acc" style="text-decoration:none" onclick="return false">${s} ↗</a>`).join("")}</div></div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+     <button data-act="save">${j.st==="saved"?"★ Saved":"☆ Save"}</button>
+     <button data-act="apply" class="${j.st==="none"||j.st==="saved"?"primary":""}">${j.st==="none"||j.st==="saved"?"Mark applied":"View in applications"}</button>
+     <button id="cover">Draft cover letter</button>
+     <button data-act="hide" class="ghost">${j.hid?"Unhide":"Not interested"}</button>
+   </div>
+   <div id="coverbox"></div>
+   <div class="desc"><b style="color:var(--text)">About the role</b>
+${j.c} is looking for a ${j.t.toLowerCase()} to join a product team building services used by millions of customers.
+
+What you'll do
+• Design and build backend services and APIs
+• Own features end to end, from design to production
+• Work with product and data teams on new capabilities
+
+What we ask
+• ${j.ok.concat(j.miss).slice(0,5).join(", ")}
+• Experience running services in production
+• Clear written communication in English</div>`;
+  $('#drawer').classList.add('open'); $('#scrim').classList.add('open');
+  $('#dclose').onclick=closeDrawer;
+  $$('#drawer button[data-act]').forEach(b=>b.onclick=()=>act(j.id,b.dataset.act));
+  $('#cover').onclick=()=>{$('#coverbox').innerHTML=`<div class="card" style="margin-top:12px"><div class="muted small" style="margin-bottom:6px">Draft from your local model. Edit before you use it.</div><div contenteditable="true" style="outline:none;line-height:1.6">Dear ${j.c} hiring team,<br><br>I'm a backend engineer with eight years of Python and Django experience, most recently building multi-tenant platforms with PostgreSQL and Celery. Your ${j.t} role stood out because ${j.why.split(".")[0].toLowerCase()}.<br><br>…</div></div>`};
+  renderJobsSelOnly();
+}
+function renderJobsSelOnly(){$$('.job').forEach(el=>el.classList.toggle('sel',+el.dataset.id===selId))}
+function closeDrawer(){$('#drawer').classList.remove('open');$('#scrim').classList.remove('open')}
+$('#scrim').onclick=closeDrawer;
+
+/* filters wiring */
+['#f-min','#f-sal','#f-salmin','#f-hideapplied','#f-expired','#f-hidden','#q','#sort'].forEach(s=>$(s).addEventListener('input',renderJobs));
+$$('.f-loc,.f-type').forEach(x=>x.addEventListener('change',renderJobs));
+function setPosted(v){F.posted=v;$$('#f-posted button').forEach(b=>b.classList.toggle('on',+b.dataset.v===v))}
+$$('#f-posted button').forEach(b=>b.onclick=()=>{setPosted(+b.dataset.v);renderJobs()});
+function selectView(v){F.view=v;$$('#views button').forEach(b=>b.classList.toggle('on',b.dataset.view===v))}
+$$('#views button').forEach(b=>b.onclick=()=>{selectView(b.dataset.view);renderJobs()});
+$('#f-reset').onclick=()=>{$('#f-min').value=60;$$('.f-loc').forEach(x=>x.checked=!["Remote US","Berlin"].includes(x.value));$$('.f-type').forEach(x=>x.checked=x.value!=="Part-time");$('#f-sal').checked=false;$('#f-salmin').value="";$('#f-hideapplied').checked=false;$('#f-expired').checked=false;$('#f-hidden').checked=false;$('#q').value="";setPosted(30);selectView('all');renderJobs()};
+$('#newbanner').onclick=()=>{$('#newbanner').style.display='none';selectView('new');renderJobs();toast("Showing 3 new jobs")};
+
+/* keyboard */
+document.addEventListener('keydown',e=>{
+  if(!$('#p-jobs').classList.contains('on')) return;
+  if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)||document.activeElement.isContentEditable) return;
+  const i=lastList.findIndex(j=>j.id===selId);
+  if(e.key==='j'||e.key==='k'){const n=e.key==='j'?Math.min(lastList.length-1,i+1):Math.max(0,i-1);if(lastList[n]){selId=lastList[n].id;renderJobsSelOnly();document.querySelector(`.job[data-id="${selId}"]`).scrollIntoView({block:'nearest'});if($('#drawer').classList.contains('open'))openDrawer(selId)}}
+  if(e.key==='Enter'&&selId) openDrawer(selId);
+  if(e.key==='Escape') closeDrawer();
+  if(selId&&e.key==='s') act(selId,'save');
+  if(selId&&e.key==='a') act(selId,'apply');
+  if(selId&&e.key==='x') act(selId,'hide');
+});
+
+/* board */
+const cols=[["saved","Saved"],["applied","Applied"],["interviewing","Interviewing"],["offer","Offer"],["rejected","Rejected"]];
+function renderBoard(){
+  $('#board').innerHTML=cols.map(([k,n])=>{const items=jobs.filter(j=>j.st===k);return `<div class="col" data-col="${k}"><h3>${n}<span class="faint">${items.length}</span></h3>${items.map(j=>`
+   <div class="kc" draggable="true" data-id="${j.id}"><div class="t">${j.c}</div><div class="muted small">${j.t}</div>
+   <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px"><span class="chip ${match(j)>=80?'ok':match(j)>=60?'warn':''}">${match(j)}%</span>
+   ${k==="applied"?`<span class="chip">${j.appliedDays===0?"Applied today":j.appliedDays+"d ago"}</span>`:""}
+   ${k==="applied"&&j.appliedDays>=14?`<span class="chip warn">Follow up?</span>`:""}
+   ${j.exp?`<span class="chip bad">Posting expired</span>`:""}
+   ${k==="interviewing"?`<span class="chip acc">Round 2 · Fri</span>`:""}</div></div>`).join("")||`<div class="faint small" style="padding:10px 4px">Drop a card here</div>`}</div>`}).join("");
+  $('#nc-apps').textContent=jobs.filter(j=>["applied","interviewing","offer"].includes(j.st)).length;
+  $$('.kc').forEach(c=>{c.ondragstart=e=>e.dataTransfer.setData('text/plain',c.dataset.id);c.ondblclick=()=>{showPage('jobs');selId=+c.dataset.id;openDrawer(selId)}});
+  $$('.col').forEach(col=>{
+    col.ondragover=e=>{e.preventDefault();col.classList.add('over')};
+    col.ondragleave=()=>col.classList.remove('over');
+    col.ondrop=e=>{e.preventDefault();col.classList.remove('over');const j=jobs.find(x=>x.id===+e.dataTransfer.getData('text/plain'));if(!j||j.st===col.dataset.col)return;const prev={st:j.st,hid:j.hid,appliedDays:j.appliedDays};j.st=col.dataset.col;if(j.st==="applied"&&prev.st!=="applied")j.appliedDays=0;renderAll();toast(`Moved ${j.c} to ${stName[j.st]}`,j,prev)};
+  });
+}
+
+/* insights */
+function renderInsights(){
+  const act=jobs.filter(j=>!j.exp);
+  const stats=[["Active matches",act.filter(j=>match(j)>=60).length*143],["80%+ matches",act.filter(j=>match(j)>=80).length*41],["Applied (30d)",jobs.filter(j=>["applied","interviewing","offer","rejected"].includes(j.st)).length+9],["Response rate","27%"]];
+  $('#stats').innerHTML=stats.map(([l,v])=>`<div class="stat"><div class="muted small">${l}</div><div class="v">${typeof v==="number"?v.toLocaleString():v}</div></div>`).join("");
+  const gaps=[["Kubernetes",38],["Go",22],["Terraform",19],["TypeScript",17],["Kafka",12],["Dutch (spoken)",11]];
+  $('#gaps').innerHTML=gaps.map(([s,p])=>`<div class="hbar"><span>${s}</span><div class="track"><span style="width:${p*2.2}%;background:var(--bad)"></span></div><span class="muted" style="text-align:right">${p}%</span></div>`).join("");
+  const fun=[["Found (80%+)",312],["Saved",48],["Applied",14],["Interviewing",4],["Offer",1]];
+  $('#funnel').innerHTML=fun.map(([l,v],i)=>`<div class="f" style="width:${Math.max(28,100-i*17)}%;opacity:${1-i*.12}">${l} · ${v}</div>`).join("");
+  const days=[14,22,9,31,18,25,12,8,27,33,19,21,16,24];const mx=Math.max(...days);
+  $('#perday').innerHTML=`<svg viewBox="0 0 280 120" width="100%" role="img" aria-label="Bar chart of new matching jobs per day">${days.map((v,i)=>`<rect x="${i*20+2}" y="${110-v/mx*95}" width="14" height="${v/mx*95}" rx="2" fill="var(--accent)"><title>${v} jobs</title></rect>`).join("")}<line x1="0" y1="110" x2="280" y2="110" stroke="var(--border-2)"/></svg><div class="faint small" style="display:flex;justify-content:space-between"><span>Oct 9</span><span>Today</span></div>`;
+  const sl=[["Amsterdam",60,105],["Rotterdam",55,85],["Berlin",65,95],["Remote EU",70,120]];
+  $('#salloc').innerHTML=sl.map(([l,a,b])=>`<div class="hbar"><span>${l}</span><div class="track" style="position:relative;background:var(--panel-2)"><span style="position:absolute;left:${(a-40)/1}%;width:${b-a}%;background:var(--ok)"></span></div><span class="muted" style="text-align:right;font-size:11px">${a}–${b}k</span></div>`).join("")+`<div class="faint small" style="display:flex;justify-content:space-between;margin-left:120px;margin-right:54px"><span>€40k</span><span>€140k</span></div>`;
+}
+
+/* sources */
+const sources=[
+ {n:"LinkedIn (guest)",via:"JobSpy",st:"ok",last:"18 min ago",f:640,nw:52,h:[580,610,655,600,640,620,640]},
+ {n:"Indeed NL",via:"JobSpy",st:"ok",last:"18 min ago",f:410,nw:37,h:[390,400,420,380,415,405,410]},
+ {n:"Glassdoor",via:"JobSpy",st:"warn",last:"18 min ago",f:62,nw:3,h:[180,175,190,160,90,70,62]},
+ {n:"Google Jobs",via:"JobSpy",st:"ok",last:"18 min ago",f:520,nw:44,h:[500,515,530,490,510,525,520]},
+ {n:"Greenhouse (312 companies)",via:"Public API",st:"ok",last:"2 h ago",f:2840,nw:61,h:[2790,2800,2810,2830,2820,2835,2840]},
+ {n:"Lever (148 companies)",via:"Public API",st:"ok",last:"2 h ago",f:1120,nw:18,h:[1100,1105,1110,1115,1112,1118,1120]},
+ {n:"Ashby (96 companies)",via:"Public API",st:"ok",last:"2 h ago",f:730,nw:12,h:[700,705,712,720,722,728,730]},
+ {n:"Workday career sites",via:"JSON endpoint",st:"bad",last:"2 h ago",f:0,nw:0,h:[410,405,420,415,0,0,0],err:"0 jobs for 3 runs. Page layout likely changed."},
+ {n:"Company sites (JobPosting)",via:"JSON-LD crawler",st:"ok",last:"5 h ago",f:960,nw:22,h:[930,940,945,950,955,958,960]},
+ {n:"Hacker News Who's Hiring",via:"LLM parse",st:"ok",last:"Oct 1",f:410,nw:0,h:[0,0,0,0,0,0,410]},
+ {n:"Remotive · RemoteOK · Arbeitnow",via:"Public feeds",st:"ok",last:"6 h ago",f:380,nw:15,h:[360,365,370,372,375,378,380]},
+];
+const spark=h=>{const mx=Math.max(...h,1);return `<svg class="spark" width="90" height="24" viewBox="0 0 90 24" aria-hidden="true"><polyline fill="none" stroke="var(--accent)" stroke-width="2" points="${h.map((v,i)=>`${i*14+3},${21-v/mx*18}`).join(" ")}"/></svg>`};
+function renderSources(){
+  const lab={ok:["ok","Healthy"],warn:["warn","Dropping"],bad:["bad","Broken"]};
+  $('#srcrows').innerHTML=sources.map((s,i)=>`<tr><td><b>${s.n}</b><div class="faint small">${s.via}</div>${s.err?`<div class="small" style="color:var(--bad)">${s.err}</div>`:""}</td>
+   <td><span class="chip ${lab[s.st][0]}">${lab[s.st][1]}</span></td><td class="muted">${s.last}</td><td>${s.f.toLocaleString()}</td><td>${s.nw}</td><td>${spark(s.h)}</td>
+   <td style="white-space:nowrap"><button data-run="${i}" style="font-size:12px">Run now</button> <button data-pause="${i}" class="ghost" style="font-size:12px">${s.paused?"Resume":"Pause"}</button></td></tr>`).join("");
+  $('#nc-src').textContent=sources.filter(s=>s.st!=="ok").length||"";
+  $$('[data-run]').forEach(b=>b.onclick=()=>{const s=sources[+b.dataset.run];b.textContent="Running…";b.disabled=true;setTimeout(()=>{s.last="Just now";if(s.st==="warn"){s.f=170;s.st="ok";s.h.push(170);s.h.shift()}renderSources();toast(s.st==="bad"?`${s.n} still returned 0 jobs`:`${s.n} finished`)},1200)});
+  $$('[data-pause]').forEach(b=>b.onclick=()=>{const s=sources[+b.dataset.pause];s.paused=!s.paused;renderSources();toast(s.paused?`Paused ${s.n}`:`Resumed ${s.n}`)});
+}
+$('#runall').onclick=()=>toast("Started all sources");
+
+/* profile */
+let pfile=null;
+const fileOk=n=>/\.(pdf|docx)$/i.test(n);
+function setFile(n,sz){pfile=n;$('#fname').textContent=n;$('#fsize').textContent=sz;$('#filerow').style.display='flex';$('#drop').style.display='none';$('#ferr').textContent=''}
+$('#file').onchange=e=>{const f=e.target.files[0];if(!f)return;if(!fileOk(f.name)){$('#ferr').textContent="That file type isn't supported. Upload a PDF or DOCX.";return}if(f.size>10*1024*1024){$('#ferr').textContent="That file is over 10 MB.";return}setFile(f.name,Math.round(f.size/1024)+" KB")};
+const dz=$('#drop');['dragover','dragenter'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('over')}));['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('over')}));
+dz.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(!f)return;if(!fileOk(f.name)){$('#ferr').textContent="That file type isn't supported. Upload a PDF or DOCX.";return}setFile(f.name,Math.round(f.size/1024)+" KB")});
+$('#frm').onclick=()=>{pfile=null;$('#filerow').style.display='none';$('#drop').style.display='block';$('#file').value=''};
+$('#sample').onclick=()=>{setFile("Resume_2026.pdf","184 KB");$('#gh').value="github.com/yourname";$('#gherr').textContent=''};
+$('#li').onclick=()=>{$('#lis').textContent="linkedin_export.zip added";$('#lis').style.color="var(--ok)"};
+['#gh','#pf'].forEach(s=>$(s).addEventListener('input',()=>$(s+'err').textContent=''));
+const urlOk=v=>!v||/^(https?:\/\/)?[\w-]+(\.[\w-]+)+(\/\S*)?$/i.test(v.trim());
+$('#readp').onclick=()=>{
+  let bad=false;
+  if(!pfile){$('#ferr').textContent="Add your resume first.";bad=true}
+  const gh=$('#gh').value.trim();
+  if(gh&&(!urlOk(gh)||!/github\.com\/[\w-]+/i.test(gh))){$('#gherr').textContent="Enter a GitHub profile URL, like github.com/yourname.";bad=true}
+  if(!urlOk($('#pf').value)){$('#pferr').textContent="Enter a valid website address.";bad=true}
+  if(bad) return;
+  $('#pstage1').style.display='none';const s=$('#pstage2');s.style.display='block';
+  const steps=["Reading resume text","Extracting skills and roles with the local model","Checking GitHub repos for evidence","Merging LinkedIn export","Building profile v4"];
+  s.innerHTML=`<div class="card"><b>Reading your profile</b><div class="muted small">Running on qwen2.5:14b locally. Nothing leaves this computer.</div><div class="prog" style="margin-top:10px">${steps.map((t,i)=>`<div id="pg${i}"><span class="faint">○</span>${t}</div>`).join("")}</div></div>`;
+  steps.forEach((t,i)=>setTimeout(()=>{$('#pg'+i).innerHTML=`<span style="color:var(--ok)">✓</span>${t}`;if(i===steps.length-1)setTimeout(review,400)},(i+1)*500));
+};
+let skills=[["Python","8 yrs","Resume + 22 GitHub repos"],["Django","6 yrs","Resume + 14 GitHub repos"],["Django REST Framework","5 yrs","Resume"],["PostgreSQL","6 yrs","Resume + 9 GitHub repos"],["Celery","4 yrs","Resume"],["Docker","4 yrs","Resume + 11 GitHub repos"],["FastAPI","1 yr","GitHub only"],["React","2 yrs","GitHub only"],["AWS","3 yrs","LinkedIn export"]];
+function review(){
+  $('#st1').className='st done';$('#st1 .n').textContent='✓';$('#st2').className='st on';
+  $('#pstage2').innerHTML=`<div class="card" style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center"><b>Review your profile</b><span class="chip ok">Profile v4 · draft</span></div>
+    <div class="muted small" style="margin-bottom:12px">Fix anything the model got wrong. Every match score uses this.</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
+      <div class="field"><label>Current title</label><input type="text" value="Senior Backend Engineer"></div>
+      <div class="field"><label>Seniority</label><select><option>Senior</option><option>Mid</option><option>Lead</option><option>Staff</option></select></div>
+      <div class="field"><label>Total experience</label><input type="text" value="8 years"></div>
+    </div>
+    <div class="field" style="margin-top:12px"><label>Skills (hover to see where each came from)</label><div id="sk" style="display:flex;flex-wrap:wrap;gap:6px"></div></div>
+    <div style="display:flex;gap:8px;margin-top:8px"><input type="text" id="ns" placeholder="Kubernetes" style="flex:1"><input type="text" id="ny" placeholder="Years" style="width:90px"><button id="addsk">Add skill</button></div>
+    <div class="err" id="nserr"></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:6px">
+      <div class="field"><label>Domains</label><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="chip acc">Fintech</span><span class="chip acc">HR tech</span><span class="chip acc">Marketplaces</span></div></div>
+      <div class="field"><label>Languages you speak</label><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="chip acc">English · fluent</span><span class="chip acc">Hindi · native</span><span class="chip">Dutch · none</span></div></div>
+    </div>
+    <div class="card" style="background:var(--panel-2);border:0;margin-top:14px"><b class="small">Changes from v3</b><div class="small muted" style="margin-top:4px"><span style="color:var(--ok)">+ FastAPI</span> · <span style="color:var(--ok)">+ AWS (3 yrs)</span> · Python 7 → 8 yrs</div></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;gap:8px"><button id="reup">← Re-upload</button><button class="primary" id="savep">Save as Profile v4 and re-score jobs</button></div>`;
+  drawSk();
+  $('#addsk').onclick=()=>{const v=$('#ns').value.trim(),y=$('#ny').value.trim();if(!v){$('#nserr').textContent="Enter a skill name first.";return}if(skills.some(x=>x[0].toLowerCase()===v.toLowerCase())){$('#nserr').textContent="That skill is already on your profile.";return}if(y&&!/^\d+(\.\d)?$/.test(y)){$('#nserr').textContent="Years must be a number, like 2 or 1.5.";return}skills.push([v,y?y+" yrs":"","Added by you"]);$('#ns').value='';$('#ny').value='';drawSk()};
+  ['#ns','#ny'].forEach(s=>$(s).addEventListener('input',()=>$('#nserr').textContent=''));
+  $('#reup').onclick=()=>{$('#pstage2').style.display='none';$('#pstage1').style.display='block';$('#st1').className='st on';$('#st1 .n').textContent='1';$('#st2').className='st'};
+  $('#savep').onclick=()=>{$('#st2').className='st done';$('#st2 .n').textContent='✓';$('#st3').className='st on';const o=document.createElement('option');o.textContent="Profile v4 · Oct 22 (active)";$('#pver').prepend(o);$('#pver').selectedIndex=0;toast("Profile v4 saved. Re-scoring 8,412 jobs in the background")};
+}
+function drawSk(){$('#sk').innerHTML=skills.map((x,i)=>`<span class="chip acc" title="${x[2]}">${x[0]}${x[1]?` <span class="faint">· ${x[1]}</span>`:""}<button class="x" data-i="${i}" aria-label="Remove ${x[0]}">✕</button></span>`).join("");$$('#sk .x').forEach(b=>b.onclick=()=>{skills.splice(+b.dataset.i,1);drawSk()})}
+
+/* settings */
+function renderWeights(){
+  $('#weights').innerHTML=Object.keys(W).map(k=>`<div style="display:grid;grid-template-columns:150px 1fr 36px;gap:10px;align-items:center;margin:8px 0"><span>${WL[k]}</span><input type="range" min="0" max="100" step="5" value="${W[k]}" data-w="${k}"><b style="text-align:right">${W[k]}</b></div>`).join("");
+  $$('[data-w]').forEach(r=>r.oninput=()=>{W[r.dataset.w]=+r.value;r.nextElementSibling.textContent=r.value;updW()});
+  updW();
+}
+function updW(){
+  const tot=Object.values(W).reduce((a,b)=>a+b,0);
+  $('#wsum').textContent=tot?`Total ${tot}. Each part counts as its share of the total.`:"All weights are 0. Set at least one above 0.";
+  $('#wsum').style.color=tot?"":"var(--bad)";
+  const top=jobs.filter(j=>!j.exp).sort((a,b)=>match(b)-match(a)).slice(0,5);
+  $('#preview').innerHTML=top.map((j,i)=>`<div style="display:flex;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)"><span class="faint" style="width:16px">${i+1}</span><span class="chip ${match(j)>=80?'ok':match(j)>=60?'warn':''}" style="width:44px;justify-content:center">${match(j)}%</span><span style="flex:1">${j.t} <span class="muted">· ${j.c}</span></span></div>`).join("");
+  renderJobs();renderBoard();
+}
+$('#wreset').onclick=()=>{W={...W0};renderWeights()};
+let searches=["Python backend · Amsterdam","Django developer · Remote EU","Senior backend engineer · Netherlands","Python contract · Remote EU"];
+function renderSearches(){$('#searches').innerHTML=searches.map((s,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="flex:1">${s}</span><button class="ghost small" data-rs="${i}">Remove</button></div>`).join("");$$('[data-rs]').forEach(b=>b.onclick=()=>{const s=searches.splice(+b.dataset.rs,1)[0];renderSearches();toast(`Removed “${s}”`)})}
+$('#addsearch').onclick=()=>{const v=$('#newsearch').value.trim();if(!v){$('#searcherr').textContent="Enter a search, like “Django developer · Utrecht”.";return}if(searches.some(s=>s.toLowerCase()===v.toLowerCase())){$('#searcherr').textContent="You already have that search.";return}searches.push(v);$('#newsearch').value='';renderSearches()};
+$('#newsearch').addEventListener('input',()=>$('#searcherr').textContent='');
+
+/* nav + theme */
+function showPage(p){$$('.page').forEach(x=>x.classList.toggle('on',x.id==='p-'+p));$$('.nav').forEach(n=>n.classList.toggle('on',n.dataset.page===p));closeDrawer();window.scrollTo(0,0)}
+$$('.nav').forEach(n=>n.onclick=()=>showPage(n.dataset.page));
+$('#theme').onclick=()=>{const r=document.documentElement;const dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=dark?"light":"dark";try{localStorage.setItem('jm-theme',r.dataset.theme)}catch(e){}};
+try{const t=localStorage.getItem('jm-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}
+
+function renderAll(){renderJobs();renderBoard();renderInsights()}
+renderWeights();renderSources();renderSearches();renderAll();
+</script>
+</body>
+</html>
