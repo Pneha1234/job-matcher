@@ -70,8 +70,8 @@ function LastScrape() {
 
 export function Sidebar() {
   return (
-    <aside className="flex flex-row flex-wrap gap-1 border-b border-sidebar-border bg-sidebar px-4 py-2.5 md:sticky md:top-0 md:h-screen md:flex-col md:flex-nowrap md:border-r md:border-b-0 md:px-3 md:py-4">
-      <div className="flex items-center gap-2.5 px-2 py-1 text-base font-semibold text-foreground md:pb-4">
+    <aside className="flex flex-row flex-wrap items-center gap-1 border-b border-sidebar-border bg-sidebar px-4 py-2.5 md:sticky md:top-0 md:h-screen md:flex-col md:flex-nowrap md:items-stretch md:border-r md:border-b-0 md:px-3 md:py-4">
+      <div className="mr-2 flex items-center gap-2.5 px-2 py-1 text-base font-semibold text-foreground md:mr-0 md:pb-4">
         <div className="grid size-[30px] place-items-center rounded-lg bg-primary font-bold text-primary-foreground">
           J
         </div>

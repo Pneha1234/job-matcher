@@ -198,7 +198,9 @@ function ParsingStage({ taskId, onDone, onBack }: { taskId: number; onDone: (ver
   return (
     <Card className="max-w-[720px]">
       <b>Reading your profile</b>
-      <div className="text-xs text-muted-foreground">Running on your local model. Nothing leaves this computer. The first run can take a minute while the model loads.</div>
+      <div className="text-xs text-muted-foreground">
+        Running on your local model. Nothing leaves this computer. Reading a full resume usually takes one to two minutes.
+      </div>
       <Progress steps={task?.progress ?? []} />
       {task?.status === "error" && (
         <div className="mt-3 text-sm text-bad">
