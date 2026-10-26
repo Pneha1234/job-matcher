@@ -1,7 +1,9 @@
 """Settings: weights (with a live re-rank preview), saved searches, locations, schedules."""
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from typing import Annotated
+
+from fastapi import APIRouter, Body, HTTPException
+from pydantic import BaseModel, Field, ValidationError
 
 from app.api.deps import DbDep, OllamaDep, TasksDep
 from app.llm import LLMError
@@ -47,8 +49,18 @@ async def get_settings_(db: DbDep, ollama: OllamaDep):
 
 
 @router.put("/settings")
-async def put_settings(db: DbDep, body: AppSettings):
+async def put_settings(db: DbDep, changes: Annotated[dict, Body()]):
+    """Merge the given fields into the stored settings. Fields that are left out keep their
+    value, and unknown fields are rejected, so a partial or mistaken request can't quietly
+    reset everything else."""
     before = load(db)
+    unknown = sorted(set(changes) - set(AppSettings.model_fields))
+    if unknown:
+        raise HTTPException(422, f"Unknown settings: {', '.join(unknown)}")
+    try:
+        body = AppSettings.model_validate({**before.model_dump(), **changes})
+    except ValidationError as e:
+        raise HTTPException(422, e.errors(include_url=False, include_context=False)) from e
     save(db, body)
     reweighted = 0
     if body.weights != before.weights:

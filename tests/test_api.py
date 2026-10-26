@@ -280,3 +280,21 @@ def test_backfill_timezones(db):
     row = db.execute("SELECT timezone, utc_offset_min FROM job_locations WHERE job_id = ?",
                      (job,)).fetchone()  # fmt: skip
     assert row["timezone"] == "Europe/Amsterdam" and row["utc_offset_min"] in (60, 120)
+
+
+def test_settings_updates_merge_and_reject_unknown_fields(client):
+    s = client.get("/settings").json()["settings"]
+    s["home_country"], s["target_countries"] = "NP", ["NL"]
+    client.put("/settings", json=s)
+    # A partial update changes only what it names.
+    assert client.put("/settings", json={"currency": "NPR"}).status_code == 200
+    after = client.get("/settings").json()["settings"]
+    assert (after["currency"], after["home_country"], after["target_countries"]) == (
+        "NPR",
+        "NP",
+        ["NL"],
+    )
+    # An unknown field is an error and changes nothing.
+    assert client.put("/settings", json={"bad": 1}).status_code == 422
+    assert client.get("/settings").json()["settings"]["home_country"] == "NP"
+    assert client.put("/settings", json={"home_country": "Nepal"}).status_code == 422
