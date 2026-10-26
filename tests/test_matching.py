@@ -166,3 +166,15 @@ def test_failed_jobs_are_retried_on_the_next_run(client, db, fake_ollama):
     assert task["result"]["scored"] == 1
     again = db.execute("SELECT status FROM match_scores WHERE job_id = ?", (job_id,)).fetchone()
     assert again["status"] == "scored"
+
+
+def test_jobs_are_scored_concurrently_with_the_smaller_context(client, db, fake_ollama):
+    for n in range(1, 6):
+        add_job(db, n, title=f"Python Django Developer {n}")
+    save_profile(db)
+    task = wait_task(client, client.post("/scoring/run").json()["task_id"])
+    assert (
+        task["result"]["scored"] == 5 and task["progress"][-1]["detail"] == "5 scored, 0 unscored"
+    )
+    chats = [c for c in fake_ollama.calls if c.get("format", {}).get("title") == "JobAssessment"]
+    assert len(chats) == 5 and {c["options"]["num_ctx"] for c in chats} == {8192}

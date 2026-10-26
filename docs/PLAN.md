@@ -398,6 +398,14 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   one (Ollama enforces it while generating), skill names are capped at 40 characters, and
   a later run retries jobs the model failed on. Result on the same Mac: profile reading
   101 s → 42 s, scoring about 35 s → 8 s per job (139 jobs in about 20 minutes instead of
-  about 90), every job scored. Running several requests
-  at once (OLLAMA_NUM_PARALLEL) is a further option that needs the Ollama service
-  reconfigured; not done.
+  about 90), every job scored.
+- 2026-10-26 — Ollama runs with OLLAMA_NUM_PARALLEL=3 (set in Homebrew's launchd plist;
+  `brew services restart` resets it, the README shows how to re-apply), and the app scores
+  three jobs at a time with an 8k context per scoring request (16k for resumes). Measured
+  on the same 6 jobs: 6.6 s per job one at a time, 4.9 s three at a time; a 15-job run
+  took 83 s. The bigger gain is that a "Score now" or a resume upload runs alongside a
+  scoring run instead of queueing behind it. On an Ollama without the setting the app's
+  parallel requests simply queue.
+- 2026-10-26 — PUT /settings merges the fields it receives into the stored settings and
+  rejects unknown fields. Replacing the whole document from the body meant a partial or
+  mistaken request reset everything else (it happened once during testing).

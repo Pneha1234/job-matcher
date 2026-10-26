@@ -121,6 +121,18 @@ ollama pull qwen2.5:7b    # scores jobs, about twice as fast
 ollama pull bge-m3        # embeddings
 ```
 
+Optional, for faster scoring: let Ollama handle three requests at once. The app scores
+three jobs at a time, and a single "Score now" no longer waits for a whole run. With
+Homebrew's service:
+
+```bash
+plutil -insert EnvironmentVariables.OLLAMA_NUM_PARALLEL -string 3 ~/Library/LaunchAgents/sh.brew.ollama.plist
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/sh.brew.ollama.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/sh.brew.ollama.plist
+```
+
+`brew services restart ollama` rewrites that file, so run these again afterwards.
+
 Install dependencies and start the API (port 8000) and UI (port 3000):
 
 ```bash

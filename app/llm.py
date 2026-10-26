@@ -89,6 +89,7 @@ class OllamaClient:
         system: str | None = None,
         model: str | None = None,
         temperature: float = 0.0,
+        num_ctx: int | None = None,
     ) -> T:
         """Return the model's reply parsed into ``schema``; one retry on invalid output."""
         messages: list[dict[str, str]] = []
@@ -106,7 +107,7 @@ class OllamaClient:
                     "messages": messages,
                     "format": schema.model_json_schema(),
                     "stream": False,
-                    "options": {"temperature": temperature, "num_ctx": self.num_ctx},
+                    "options": {"temperature": temperature, "num_ctx": num_ctx or self.num_ctx},
                 },
             )
             content = data.get("message", {}).get("content", "")

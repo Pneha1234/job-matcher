@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     # prompts. A long resume plus a LinkedIn export, or a long posting plus the profile,
     # needs more.
     llm_num_ctx: int = 16384
+    # One job's prompt (posting capped at 7,000 characters, profile, schema) fits in 8k,
+    # and a smaller context leaves room for parallel requests.
+    scoring_num_ctx: int = 8192
+    # Jobs scored at once. Pays off when Ollama runs with OLLAMA_NUM_PARALLEL > 1 (measured
+    # 6.6 s -> 4.9 s per job on an M-series laptop with 3); otherwise Ollama queues them.
+    scoring_concurrency: int = 3
     ui_origin: str = "http://localhost:3000"
     # Seconds between live requests to one source (random within the range).
     scrape_delay_min: float = 3.0

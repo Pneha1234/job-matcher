@@ -1,10 +1,12 @@
 """Embedding, Stage A shortlist, Stage B scoring and the background re-score task."""
 
+import asyncio
 import logging
 import sqlite3
 
 import sqlite_vec
 
+from app.config import get_settings
 from app.llm import LLMError, OllamaClient
 from app.matching import eligibility
 from app.matching.score import (
@@ -175,7 +177,13 @@ async def score_job(
         row["error"] = "The source gave no description to compare. Open the posting to judge it."
     else:
         try:
-            a = await ollama.generate_json(prompt, JobAssessment, system=SYSTEM, model=model)
+            a = await ollama.generate_json(
+                prompt,
+                JobAssessment,
+                system=SYSTEM,
+                model=model,
+                num_ctx=get_settings().scoring_num_ctx,
+            )
         except LLMError as e:
             row["error"] = str(e)[:500]
     if a is not None:
@@ -269,14 +277,18 @@ async def run_scoring(
     todo = [(j, s) for j, s in picks if j not in scored_ids]
     ctx.step(1, "done", f"{len(picks)} jobs, {len(todo)} not scored yet")
     ctx.step(2, "running", f"0 / {len(todo)}")
-    scored = failed = 0
-    for i, (job_id, sim) in enumerate(todo, start=1):
-        row = await score_job(conn, ollama, settings, version_id, profile, job_id, sim)
-        if row["status"] == "scored":
-            scored += 1
-        else:
-            failed += 1
-        ctx.step(2, "running", f"{i} / {len(todo)}")
+    counts = {"scored": 0, "unscored": 0}
+    gate = asyncio.Semaphore(max(1, get_settings().scoring_concurrency))
+
+    async def one(job_id: int, sim: float) -> None:
+        # Jobs start best-first; up to `scoring_concurrency` run at once.
+        async with gate:
+            row = await score_job(conn, ollama, settings, version_id, profile, job_id, sim)
+        counts[row["status"]] += 1
+        ctx.step(2, "running", f"{counts['scored'] + counts['unscored']} / {len(todo)}")
+
+    await asyncio.gather(*(one(job_id, sim) for job_id, sim in todo))
+    scored, failed = counts["scored"], counts["unscored"]
     ctx.step(2, "done", f"{scored} scored, {failed} unscored")
     return {"profile_version_id": version_id, "scored": scored, "unscored": failed}
 
