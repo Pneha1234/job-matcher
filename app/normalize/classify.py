@@ -160,6 +160,20 @@ def india_fields(text: str) -> dict:
     return out
 
 
+LATIN1_MOJIBAKE = re.compile("[ÂÃâ][\u0080-¿]")
+
+
+def repair_mojibake(value: str | None) -> str | None:
+    """RemoteOK sends some UTF-8 text decoded as Latin-1 ("Sothebyâ\\x80\\x99s"); undo it.
+    Text that isn't such a mix fails the round trip and comes back unchanged."""
+    if not value or not LATIN1_MOJIBAKE.search(value):
+        return value
+    try:
+        return value.encode("latin-1").decode("utf-8")
+    except UnicodeError:
+        return value
+
+
 def html_to_text(value: str | None) -> str:
     """Postings arrive as HTML, sometimes HTML-escaped HTML; return readable plain text."""
     if not value:

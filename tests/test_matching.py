@@ -1,7 +1,7 @@
 import pytest
 
 from app.matching import eligibility
-from app.matching.score import JobAssessment, final_pct, sub_scores
+from app.matching.score import JobAssessment, final_pct, is_teaser, posting_text, sub_scores
 from app.profile.schema import ProfileData
 from app.settings_store import AppSettings, Weights, load, save
 from tests.conftest import wait_task
@@ -178,3 +178,39 @@ def test_jobs_are_scored_concurrently_with_the_smaller_context(client, db, fake_
     )
     chats = [c for c in fake_ollama.calls if c.get("format", {}).get("title") == "JobAssessment"]
     assert len(chats) == 5 and {c["options"]["num_ctx"] for c in chats} == {8192}
+
+
+# RemoteOK's API sends only the start of some postings, plus a note for applicants.
+REMOTEOK_TEASER = (
+    "Remote - Established in 1744, Sotheby's promotes access and ownership of exceptional "
+    "art and luxury objects. Our deep expertise is supported by a leading technology "
+    "platform and a global network of special...\n\n"
+    "Please mention the word **EVALUATIVE** and tag RMjQw when applying to show you read "
+    "the job post completely (#RMjQw). This is a beta feature to avoid spam applicants."
+)
+
+
+def test_teaser_is_unscored_without_an_llm_call_and_not_retried(client, db, fake_ollama):
+    job_id = add_job(db, 1, description=REMOTEOK_TEASER)
+    save_profile(db)
+    task = wait_task(client, client.post(f"/jobs/{job_id}/score").json()["task_id"])
+    assert task["result"]["status"] == "unscored"
+    assert "only gave the start" in task["result"]["error"]
+    wait_task(client, client.post("/scoring/run").json()["task_id"])
+    assert not [c for c in fake_ollama.calls if "messages" in c]
+
+
+def test_teaser_rule_keeps_complete_posts():
+    assert is_teaser(posting_text(REMOTEOK_TEASER))
+    # HN posts end in a shortened link and are complete.
+    assert not is_teaser("Rust, Postgres.\nFull description: https://acme.notion.site/Lead-Rust...")
+    assert not is_teaser("We need Go and Kafka. " * 80 + "and more...")
+    assert not is_teaser("We need Go, Kafka and Kubernetes. Apply now.")
+
+
+def test_board_tags_reach_the_model(client, db, fake_ollama):
+    job_id = add_job(db, 1, extra={"tags": ["golang", "senior"]})
+    save_profile(db)
+    wait_task(client, client.post(f"/jobs/{job_id}/score").json()["task_id"])
+    prompts = [str(c["messages"]) for c in fake_ollama.calls if "messages" in c]
+    assert prompts and "Tags from the job board: golang, senior" in prompts[-1]

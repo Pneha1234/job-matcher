@@ -186,6 +186,10 @@ def test_feeds_parse():
         {"id": "9", "position": "Python Dev", "company": "Co", "url": "https://remoteok.com/9",
          "description": "<p>Py</p>", "location": "Worldwide", "salary_min": 50000,
          "salary_max": 70000, "date": "2026-10-24T00:00:00+00:00"},
+        # RemoteOK sends some UTF-8 text decoded as Latin-1.
+        {"id": "10", "position": "Go Engineer", "company": "Sothebyâ\u0080\u0099s",
+         "url": "https://remoteok.com/10", "description": "<p>Go at Sothebyâ\u0080\u0099s</p>",
+         "location": "Worldwide", "date": "2026-10-24T00:00:00+00:00", "tags": ["golang"]},
     ]  # fmt: skip
     wwr = (
         "<rss><channel><item><title>Acme: Senior Django Developer</title>"
@@ -201,7 +205,10 @@ def test_feeds_parse():
         r2, _ = run(
             conn, "weworkremotely", {"https://weworkremotely.com": httpx.Response(200, text=wwr)}
         )
-        assert r1["found"] == 1 and r2["found"] == 1
+        assert r1["found"] == 2 and r2["found"] == 1
+        go = conn.execute("SELECT * FROM jobs WHERE title = 'Go Engineer'").fetchone()
+        assert go["company_name"] == "Sotheby’s" and go["description"] == "Go at Sotheby’s"
+        assert json.loads(go["extra"])["tags"] == ["golang"]
         job = conn.execute("SELECT * FROM jobs WHERE company_name = 'Acme'").fetchone()
         assert job["title"] == "Senior Django Developer"
         assert json.loads(job["remote_eligibility"])["worldwide"] is True
@@ -462,6 +469,59 @@ def test_adzuna_with_key(tmp_path):
     assert seen[0].params["app_id"] == "id123"
     assert job["salary_min"] is None  # predicted salaries are not real salaries
     assert job["job_type"] == "full-time"
+
+
+REED_SNIPPET = "We are recruiting for a Python engineer on behalf of a fast-growing..."
+REED_FULL = "<p>We are recruiting for a Python engineer.</p>" + "<p>Go, Kafka and AWS.</p>" * 60
+
+
+def _reed_setup(tmp_path):
+    from app.settings_store import set_value
+
+    conn = init_db(tmp_path / "jm.db")
+    set_value(conn, "api_keys", {"reed": "k"})
+    with conn:
+        conn.execute(
+            "INSERT INTO saved_searches (name, filters) VALUES "
+            '(\'x\', \'{"query": "Python developer", "location": "London"}\')'
+        )
+    results = [
+        {"jobId": n, "jobUrl": f"https://www.reed.co.uk/jobs/{n}", "jobTitle": f"Engineer {n}",
+         "employerName": "Acme", "jobDescription": REED_SNIPPET, "locationName": "London",
+         "date": "25/10/2026"}
+        for n in (1, 2)
+    ]  # fmt: skip
+    routes = {
+        "https://www.reed.co.uk/api/1.0/search": httpx.Response(200, json={"results": results}),
+        "https://www.reed.co.uk/api/1.0/jobs/": httpx.Response(
+            200, json={"jobDescription": REED_FULL}
+        ),
+    }
+    return conn, routes
+
+
+def test_reed_fetches_full_text_once_per_job(tmp_path):
+    conn, routes = _reed_setup(tmp_path)
+    result, calls = run(conn, "reed", routes)
+    assert result["found"] == 2
+    assert len([c for c in calls if "/api/1.0/jobs/" in c]) == 2
+    descriptions = [r[0] for r in conn.execute("SELECT description FROM jobs")]
+    assert all("Go, Kafka and AWS." in d for d in descriptions)
+    # Jobs already held in full aren't fetched again.
+    _, calls = run(conn, "reed", routes)
+    assert not [c for c in calls if "/api/1.0/jobs/" in c]
+
+
+def test_reed_full_text_stays_within_the_daily_budget(tmp_path):
+    conn, routes = _reed_setup(tmp_path)
+    with conn:
+        conn.execute(
+            "INSERT INTO source_budget (source, day, used) VALUES ('reed', date('now'), 48)"
+        )
+    result, calls = run(conn, "reed", routes)
+    # 48 used + 1 search leaves 1 request for details; the other job keeps its snippet.
+    assert result["status"] == "ok"
+    assert len([c for c in calls if "/api/1.0/jobs/" in c]) == 1
 
 
 def test_reed_dates_are_day_first():

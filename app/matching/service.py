@@ -14,6 +14,8 @@ from app.matching.score import (
     JobAssessment,
     build_prompt,
     final_pct,
+    is_teaser,
+    posting_text,
     sub_scores,
 )
 from app.normalize.dedup import merge_near_duplicates
@@ -27,6 +29,7 @@ from app.util import dumps, loads, now_iso
 log = logging.getLogger(__name__)
 EMBED_BATCH = 32
 KNN_MAX = 4096  # sqlite-vec's cap on k
+NO_FULL_TEXT = "The source only gave the start of this posting. Open it to judge it."
 
 
 def job_text(row: sqlite3.Row) -> str:
@@ -173,8 +176,11 @@ async def score_job(
     )
     row: dict = {"status": "unscored", "model": model, "similarity": similarity}
     a: JobAssessment | None = None
-    if len((job["description"] or "").strip()) < 80:
+    text = posting_text(job["description"])
+    if len(text) < 80:
         row["error"] = "The source gave no description to compare. Open the posting to judge it."
+    elif is_teaser(text):
+        row["error"] = NO_FULL_TEXT
     else:
         try:
             a = await ollama.generate_json(
@@ -265,13 +271,13 @@ async def run_scoring(
     vec = await profile_vector(conn, ollama, version_id, profile)
     picks = shortlist(conn, settings, vec, limit or settings.shortlist_size)
     # Jobs already scored are kept; ones the model failed on are tried again. Jobs with no
-    # description stay skipped, since nothing has changed for them.
+    # description or only a teaser stay skipped, since nothing has changed for them.
     scored_ids = {
         r[0]
         for r in conn.execute(
             "SELECT job_id FROM match_scores WHERE profile_version_id = ? AND (status = 'scored' "
-            "OR error LIKE 'The source gave no description%')",
-            (version_id,),
+            "OR error LIKE 'The source gave no description%' OR error = ?)",
+            (version_id, NO_FULL_TEXT),
         )
     }
     todo = [(j, s) for j, s in picks if j not in scored_ids]

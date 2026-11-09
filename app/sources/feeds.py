@@ -5,7 +5,7 @@ import re
 import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
 
-from app.normalize.classify import html_to_text
+from app.normalize.classify import html_to_text, repair_mojibake
 from app.sources.ats import _dt
 from app.sources.base import FetchContext, FetchResult, RawJob, Source
 
@@ -60,9 +60,9 @@ class RemoteOK(FeedSource):
                     source=self.name,
                     source_job_id=str(j["id"]),
                     url=j["url"],
-                    title=j["position"],
-                    company=j.get("company") or "Unknown",
-                    description=html_to_text(j.get("description")),
+                    title=repair_mojibake(j["position"]),
+                    company=repair_mojibake(j.get("company")) or "Unknown",
+                    description=html_to_text(repair_mojibake(j.get("description"))),
                     remote=True,
                     remote_scope=[j.get("location") or ""],
                     salary_min=j.get("salary_min") or None,

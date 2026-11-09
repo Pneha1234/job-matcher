@@ -416,3 +416,21 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   bid pipeline replace the match % and the application board. The app never submits a
   bid. The design and both diagrams are in [ARCHITECTURE.md](ARCHITECTURE.md); sources are
   in [CLIENT_SOURCES.md](CLIENT_SOURCES.md), TED first. Nothing is built yet.
+- 2026-11-09 — A posting the source cut short is not scored. RemoteOK's API sends only
+  the start of some postings (a Go role arrived as two lines about the company), and the
+  schema's "at least one required skill" made the model fill the list from the profile:
+  Python, Django and the rest, all "matched", 100%. Now a text under 1,500 characters
+  that ends in "..." is unscored with "The source only gave the start of this posting",
+  without an LLM call, and isn't retried each run. A last word that is a link doesn't
+  count, since HN posts end in shortened links and are complete. Jobejee listing snippets
+  (cut at 500 characters) fall under the same rule. A length cut-off alone was rejected:
+  30 complete HN posts and most Jobejee ones are under 800 characters. RemoteOK's tags
+  ("golang") now reach the model as "Tags from the job board", its applicant note is
+  dropped from the prompt, and its Latin-1-garbled text ("Sothebyâ\x80\x99s") is repaired
+  on ingest.
+- 2026-11-09 — Reed fetches each posting's full text. Its search returns only about 450
+  characters per job, which the rule above leaves unscored. After the searches, Reed calls
+  its details endpoint (`/api/1.0/jobs/{id}`, same free key) for jobs not already stored
+  with 1,000+ characters, up to what is left of the 50-request daily budget; the rest keep
+  the snippet and get their full text on a later day. First live run: 80 of 100 London
+  jobs got full text, using the whole day's budget.

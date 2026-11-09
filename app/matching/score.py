@@ -6,6 +6,8 @@ match / one level off ...); code maps classes to numbers. A sub-score the postin
 no basis for is None and drops out of the weighted average.
 """
 
+import json
+import re
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -13,6 +15,33 @@ from pydantic import BaseModel, Field
 from app.settings_store import Weights
 
 SUB_KEYS = ("required", "nice", "seniority", "domain", "location")
+
+# RemoteOK appends this note for human applicants to every description; it says nothing
+# about the job.
+APPLICANT_NOTE = re.compile(r"Please mention the word \*\*\w+\*\*.*", re.S)
+# Some sources send only the start of a posting (RemoteOK's API, Jobejee's listing page).
+# The model then has no requirements to read and fills the list from the profile, so a
+# cut-off text below this length is not scored. HN posts end in shortened links ("...")
+# and are complete, so a text whose last word is a link doesn't count.
+TEASER_MAX_CHARS = 1500
+
+
+def posting_text(description: str | None) -> str:
+    return APPLICANT_NOTE.sub("", description or "").strip()
+
+
+def is_teaser(text: str) -> bool:
+    if len(text) >= TEASER_MAX_CHARS or not text.endswith(("...", "…")):
+        return False
+    return "/" not in text.split()[-1]
+
+
+def source_tags(extra: str | None) -> list[str]:
+    try:
+        tags = json.loads(extra or "{}").get("tags") or []
+    except (json.JSONDecodeError, AttributeError):
+        return []
+    return [str(t) for t in tags if str(t).strip()][:20]
 
 
 class SkillCheck(BaseModel):
@@ -92,6 +121,7 @@ def final_pct(subs: dict[str, float | None], weights: Weights) -> float | None:
 
 
 def build_prompt(profile_text: str, facts: list[str], job: dict, locations: list[str]) -> str:
+    tags = source_tags(job.get("extra"))
     return "\n".join(
         [
             "CANDIDATE PROFILE:",
@@ -105,7 +135,9 @@ def build_prompt(profile_text: str, facts: list[str], job: dict, locations: list
             f"Locations: {', '.join(locations) or 'not stated'}",
             f"Work mode: {job['work_mode'] or 'not stated'}",
             f"Type: {job['job_type'] or 'not stated'}",
+            # Some boards name the main skills only in tags (RemoteOK: "golang").
+            *([f"Tags from the job board: {', '.join(tags)}"] if tags else []),
             "Description:",
-            (job["description"] or "")[:7000],
+            posting_text(job["description"])[:7000],
         ]
     )

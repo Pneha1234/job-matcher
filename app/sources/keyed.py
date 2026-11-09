@@ -128,6 +128,7 @@ class Reed(KeyedSource):
         result = FetchResult()
         token = base64.b64encode(f"{ctx.api_key}:".encode()).decode()
         headers = {"Authorization": f"Basic {token}"}  # the key is the username
+        found: dict[str, dict] = {}
         for search in ctx.searches:
             params = {"keywords": search["query"], "resultsToTake": 100}
             if search.get("location"):
@@ -136,26 +137,58 @@ class Reed(KeyedSource):
                 "https://www.reed.co.uk/api/1.0/search", params=params, headers=headers
             )
             for j in data.get("results", []):
-                result.jobs.append(
-                    RawJob(
-                        source=self.name,
-                        source_job_id=str(j["jobId"]),
-                        url=j["jobUrl"],
-                        title=j["jobTitle"],
-                        company=j.get("employerName") or "Unknown",
-                        description=html_to_text(j.get("jobDescription")),
-                        locations=[f"{j.get('locationName') or ''}, United Kingdom"],
-                        salary_min=j.get("minimumSalary"),
-                        salary_max=j.get("maximumSalary"),
-                        salary_currency=j.get("currency") or "GBP",
-                        salary_period="year",
-                        posted_at=_reed_date(j.get("date")),
-                        valid_through=_reed_date(j.get("expirationDate")),
-                        country_hint="GB",
-                    )
+                found.setdefault(str(j["jobId"]), j)
+        # Search results carry only the first ~450 characters of a posting, too little to
+        # score. The details call returns the full text, one request per job, so it runs
+        # for jobs we don't already hold in full, within what is left of today's budget;
+        # the rest keep the snippet until a later run.
+        full = _full_text_ids(ctx, list(found))
+        todo = [i for i in found if i not in full]
+        for job_id in todo[: max(0, ctx.http.budget - ctx.http.used_today())]:
+            detail = await ctx.http.get_json(
+                f"https://www.reed.co.uk/api/1.0/jobs/{job_id}", headers=headers
+            )
+            if detail.get("jobDescription"):
+                found[job_id]["jobDescription"] = detail["jobDescription"]
+        for j in found.values():
+            result.jobs.append(
+                RawJob(
+                    source=self.name,
+                    source_job_id=str(j["jobId"]),
+                    url=j["jobUrl"],
+                    title=j["jobTitle"],
+                    company=j.get("employerName") or "Unknown",
+                    description=html_to_text(j.get("jobDescription")),
+                    locations=[f"{j.get('locationName') or ''}, United Kingdom"],
+                    salary_min=j.get("minimumSalary"),
+                    salary_max=j.get("maximumSalary"),
+                    salary_currency=j.get("currency") or "GBP",
+                    salary_period="year",
+                    posted_at=_reed_date(j.get("date")),
+                    valid_through=_reed_date(j.get("expirationDate")),
+                    country_hint="GB",
                 )
+            )
         result.requests = ctx.http.requests
         return result
+
+
+# Longer than any search snippet (~450 characters), shorter than a real posting.
+REED_FULL_TEXT_CHARS = 1000
+
+
+def _full_text_ids(ctx: FetchContext, job_ids: list[str]) -> set[str]:
+    """Reed job ids whose job already has a full description stored."""
+    if not job_ids:
+        return set()
+    marks = ",".join("?" * len(job_ids))
+    rows = ctx.conn.execute(
+        "SELECT s.source_job_id FROM job_sources s JOIN jobs j ON j.id = s.job_id "
+        f"WHERE s.source = 'reed' AND s.source_job_id IN ({marks}) "
+        "AND length(j.description) >= ?",
+        (*job_ids, REED_FULL_TEXT_CHARS),
+    )
+    return {r[0] for r in rows}
 
 
 def _reed_date(value: str | None):
