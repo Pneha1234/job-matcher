@@ -434,3 +434,14 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   with 1,000+ characters, up to what is left of the 50-request daily budget; the rest keep
   the snippet and get their full text on a later day. First live run: 80 of 100 London
   jobs got full text, using the whole day's budget.
+- 2026-11-09 — Seniority comes from the title when it states a level. qwen2.5:7b rated
+  "Backend Developer Intern | Freshers Welcome" a seniority match for a senior profile,
+  and it scored 94%. Code now reads intern / junior / mid / senior / lead-staff /
+  principal-director words from the title (and job type "internship"), measures the gap
+  to the profile's level, and that gap overrides the model; a title with no level keeps
+  the model's answer. A role two or more levels below you is capped at 50%, since
+  required skills alone carry half the weight and the intern role still showed 78%
+  without a cap. Roles above you lose seniority points but aren't capped: a senior
+  looking at principal roles is a stretch, not a mismatch (decided on 2026-11-09).
+  Existing scores were recomputed from their stored assessments, no LLM calls: the
+  intern role went from 94% to 50%, principal roles to 78–82%.

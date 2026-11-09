@@ -18,6 +18,7 @@ from app.matching.score import (
     posting_text,
     sub_scores,
 )
+from app.matching.seniority import level_gap, seniority_fit
 from app.normalize.dedup import merge_near_duplicates
 from app.profile import store
 from app.profile.schema import ProfileData
@@ -193,7 +194,11 @@ async def score_job(
         except LLMError as e:
             row["error"] = str(e)[:500]
     if a is not None:
-        subs = sub_scores(a, location, gaps)
+        gap = level_gap(job["title"], job["job_type"], profile.seniority)
+        level = seniority_fit(gap)
+        subs = sub_scores(a, location, gaps, level)
+        if gap is not None and gap <= -2:
+            subs["far_below_your_level"] = True
         pct = final_pct(subs, settings.weights)
         missing = [c.skill for c in a.required_skills if c.status == "missing"] + [
             f"{g} (spoken)" for g in gaps
@@ -205,6 +210,7 @@ async def score_job(
                     "assessment": a.model_dump(),
                     "location_status": location,
                     "location_reason": location_reason,
+                    "seniority_from_title": level,
                 }
             ),
             matched_skills=dumps(

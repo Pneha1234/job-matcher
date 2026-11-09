@@ -2,6 +2,7 @@ import pytest
 
 from app.matching import eligibility
 from app.matching.score import JobAssessment, final_pct, is_teaser, posting_text, sub_scores
+from app.matching.seniority import level_gap, seniority_fit, title_levels
 from app.profile.schema import ProfileData
 from app.settings_store import AppSettings, Weights, load, save
 from tests.conftest import wait_task
@@ -214,3 +215,54 @@ def test_board_tags_reach_the_model(client, db, fake_ollama):
     wait_task(client, client.post(f"/jobs/{job_id}/score").json()["task_id"])
     prompts = [str(c["messages"]) for c in fake_ollama.calls if "messages" in c]
     assert prompts and "Tags from the job board: golang, senior" in prompts[-1]
+
+
+def test_title_levels():
+    assert title_levels("Backend Developer Intern | Freshers Welcome") == {0}
+    assert title_levels("Python Developer", "internship") == {0}
+    assert title_levels("Sr. Data Engineer") == {3}
+    assert title_levels("Senior/Lead Backend Engineer") == {3, 4}
+    # No level in the title, or words that only look like one.
+    assert title_levels("Software Engineer") == set()
+    assert title_levels("Member of Technical Staff Engineering") == set()
+    assert title_levels("Internal Tools Engineer") == set()
+
+
+def test_level_in_the_title_overrides_the_model():
+    assert level_gap("Backend Developer Intern", None, "senior") == -3
+    assert level_gap("Principal Engineer", None, "senior") == 2
+    assert level_gap("Senior/Lead Backend Engineer", None, "senior") == 0
+    assert level_gap("Software Engineer", None, "senior") is None  # the model decides
+    assert level_gap("Junior Developer", None, None) is None  # profile has no level
+    assert seniority_fit(-3) == seniority_fit(2) == "two_or_more_off"
+    assert seniority_fit(1) == "one_level_off" and seniority_fit(None) is None
+    a = JobAssessment.model_validate(ASSESSMENT)  # the model said "match"
+    assert sub_scores(a, "eligible", [], "two_or_more_off")["seniority"] == 20
+
+
+def test_only_roles_far_below_you_are_capped():
+    all_skills = {**ASSESSMENT, "required_skills": [{"skill": "Python", "status": "matched"}]}
+    a = JobAssessment.model_validate(all_skills)
+    assert final_pct(sub_scores(a, "eligible", []), Weights()) > 90
+    far = sub_scores(a, "eligible", [], "two_or_more_off")
+    # Above you (a senior looking at principal roles): fewer points, no cap.
+    assert final_pct(far, Weights()) > 50
+    assert final_pct({**far, "far_below_your_level": True}, Weights()) == 50
+
+
+def test_intern_role_scores_low_for_a_senior_profile(client, db, fake_ollama):
+    # The fake model answers "match" for seniority, as qwen2.5:7b did for an internship.
+    job_id = add_job(db, 1, title="Backend Developer Intern | Freshers Welcome")
+    save_profile(db)  # seniority: senior
+    task = wait_task(client, client.post(f"/jobs/{job_id}/score").json()["task_id"])
+    assert task["result"]["status"] == "scored"
+    row = db.execute("SELECT final_pct FROM match_scores WHERE job_id = ?", (job_id,)).fetchone()
+    assert row["final_pct"] <= 50
+
+
+def test_principal_role_is_not_capped_for_a_senior_profile(client, db, fake_ollama):
+    job_id = add_job(db, 1, title="Principal Python Developer")
+    save_profile(db)  # seniority: senior
+    wait_task(client, client.post(f"/jobs/{job_id}/score").json()["task_id"])
+    row = db.execute("SELECT final_pct FROM match_scores WHERE job_id = ?", (job_id,)).fetchone()
+    assert row["final_pct"] > 50

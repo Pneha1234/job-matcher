@@ -15,6 +15,12 @@ from pydantic import BaseModel, Field
 from app.settings_store import Weights
 
 SUB_KEYS = ("required", "nice", "seniority", "domain", "location")
+SeniorityFit = Literal["match", "one_level_off", "two_or_more_off", "unclear"]
+# A role two or more levels below yours (an internship for a senior engineer) can't rank
+# as a strong match however well the skills overlap; required skills alone carry half the
+# weight, so without a cap it still showed 78%. Roles above you lose seniority points but
+# aren't capped: a senior aiming at principal is a stretch, not a mismatch.
+SENIORITY_GAP_CAP = 50
 
 # RemoteOK appends this note for human applicants to every description; it says nothing
 # about the job.
@@ -56,7 +62,7 @@ class JobAssessment(BaseModel):
     # scored (qwen2.5:7b did this for a third of postings).
     required_skills: list[SkillCheck] = Field(min_length=1, max_length=10)
     nice_to_have_skills: list[SkillCheck] = Field(default_factory=list, max_length=6)
-    seniority_fit: Literal["match", "one_level_off", "two_or_more_off", "unclear"]
+    seniority_fit: SeniorityFit
     domain_fit: Literal["same", "related", "different", "unclear"]
     location_language_fit: Literal["fits", "minor_issue", "blocker", "unclear"]
     explanation: str = Field(min_length=10, max_length=320)
@@ -90,7 +96,10 @@ def _skills_score(checks: list[SkillCheck]) -> float | None:
 
 
 def sub_scores(
-    a: JobAssessment, location: str, language_gaps: list[str]
+    a: JobAssessment,
+    location: str,
+    language_gaps: list[str],
+    seniority: SeniorityFit | None = None,
 ) -> dict[str, float | None]:
     loc = LOCATION[a.location_language_fit]
     # Code-side facts override the model where they are certain.
@@ -105,7 +114,8 @@ def sub_scores(
     return {
         "required": _skills_score(a.required_skills),
         "nice": _skills_score(a.nice_to_have_skills),
-        "seniority": SENIORITY[a.seniority_fit],
+        # A level stated in the title (worked out in code) beats the model's reading.
+        "seniority": SENIORITY[seniority or a.seniority_fit],
         "domain": DOMAIN[a.domain_fit],
         "location": loc,
     }
@@ -117,7 +127,10 @@ def final_pct(subs: dict[str, float | None], weights: Weights) -> float | None:
     total = sum(weight for _, weight in parts)
     if not total or subs.get("required") is None:
         return None  # without required skills there is nothing honest to rank on
-    return round(sum(score * weight for score, weight in parts) / total, 1)
+    pct = round(sum(score * weight for score, weight in parts) / total, 1)
+    if subs.get("far_below_your_level"):
+        pct = min(pct, SENIORITY_GAP_CAP)
+    return pct
 
 
 def build_prompt(profile_text: str, facts: list[str], job: dict, locations: list[str]) -> str:
