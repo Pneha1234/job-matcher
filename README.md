@@ -6,6 +6,17 @@ model running on your own machine.
 
 ![Jobs ranked by match](docs/screenshots/jobs.png)
 
+## How it works
+
+**Ingest → Retrieve → Reason → Rank → Track.** Jobs from 35 free sources are cleaned and
+deduplicated. Vector search narrows thousands of them to a shortlist. A local LLM reads
+each shortlisted job and classifies the fit. Code turns that into a match % with your
+weights, and you track what you applied for.
+
+The rule behind it: **LLM for perception, code for judgement.** The model reads and
+classifies; it never produces the number. See the diagrams in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ## Screens
 
 | | |
@@ -101,6 +112,17 @@ FastAPI ──► Next.js UI: Jobs · Applications · Insights · Sources · Pro
 
 Background work (parsing, source runs, scoring) runs as in-process tasks whose progress
 the UI polls. An APScheduler tick runs each source group on its schedule.
+
+## What's next: Client Matcher
+
+A second mode on the same pipeline, designed but not built yet. Instead of jobs for a
+person, it finds work a company can apply for across Europe: public tenders, places on
+frameworks and dynamic purchasing systems, consultant broker assignments, subcontracts
+under the suppliers that won big contracts, and EU funding calls. Each one gets a bid fit
+% and moves through a bid pipeline. Most of the engine is reused; the
+[design](docs/ARCHITECTURE.md#2-client-matcher-proposed) shows what is reused, extended
+and new, and [docs/CLIENT_SOURCES.md](docs/CLIENT_SOURCES.md) lists the free sources,
+starting with TED, the EU's tender database.
 
 ## Tech stack
 
