@@ -77,6 +77,11 @@ cross-site requests, so web pages open in your browser can't act on your data.
 
 ## Architecture
 
+The pipeline is **Ingest → Retrieve → Reason → Rank → Track**: the local LLM reads and
+classifies, and code makes every decision that produces a number. Diagrams, the role of
+each local model and the proposed Client Matcher mode are in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ```
 Sources (ATS APIs, feeds, JobSpy, sitemaps, free-key APIs)
       │  fetch(ctx) -> FetchResult(RawJob…, complete scopes)

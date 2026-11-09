@@ -409,3 +409,9 @@ own profile, a week of daily use, three unattended days) are not claimed here.
 - 2026-10-26 — PUT /settings merges the fields it receives into the stored settings and
   rejects unknown fields. Replacing the whole document from the body meant a partial or
   mistaken request reset everything else (it happened once during testing).
+- 2026-11-09 — Client Matcher proposed as a second mode: the same Ingest → Retrieve →
+  Reason → Rank → Track pipeline applied to Finnish companies, classified as direct
+  client, subcontracting partner, partner network or project, with a client fit score and
+  a sales pipeline instead of the application tracker. The design and both diagrams are in
+  [ARCHITECTURE.md](ARCHITECTURE.md). Nothing is built yet; its sources are still to be
+  checked.
