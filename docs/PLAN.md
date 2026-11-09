@@ -410,8 +410,9 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   rejects unknown fields. Replacing the whole document from the body meant a partial or
   mistaken request reset everything else (it happened once during testing).
 - 2026-11-09 — Client Matcher proposed as a second mode: the same Ingest → Retrieve →
-  Reason → Rank → Track pipeline applied to Finnish companies, classified as direct
-  client, subcontracting partner, partner network or project, with a client fit score and
-  a sales pipeline instead of the application tracker. The design and both diagrams are in
-  [ARCHITECTURE.md](ARCHITECTURE.md). Nothing is built yet; its sources are still to be
-  checked.
+  Reason → Rank → Track pipeline applied to opportunities a company applies for, not jobs
+  for a person: tenders, frameworks and dynamic purchasing systems, broker assignments,
+  subcontracts and EU funding calls, across Europe (EU, EEA and UK). A bid fit score and a
+  bid pipeline replace the match % and the application board. The app never submits a
+  bid. The design and both diagrams are in [ARCHITECTURE.md](ARCHITECTURE.md); sources are
+  in [CLIENT_SOURCES.md](CLIENT_SOURCES.md), TED first. Nothing is built yet.

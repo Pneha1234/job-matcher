@@ -110,37 +110,41 @@ jobs does.
 ## 2. Client Matcher (proposed)
 
 Same pipeline, different question. Instead of "which job fits me?", it asks "which
-Finnish company needs what I offer?". The colours show what is reused as it is, what is
-extended, and what is new.
+opportunity can my company apply for and win?". The opportunities are ones a company
+applies for, not jobs for a person: public tenders, places on frameworks and dynamic
+purchasing systems, broker assignments, subcontracts and EU funding calls, across Europe.
+The colours show what is reused as it is, what is extended, and what is new.
 
 ```mermaid
 flowchart LR
     subgraph IN["Ingest"]
         direction TB
-        F1["Finnish business registry<br/>companies, industry, size"]
-        F2["Career pages and job boards<br/>hiring = a need signal"]
-        F3["Public tenders<br/>projects"]
-        N["Polite fetching, normalise,<br/>entity resolution"]
+        F1["Public tenders (TED, Hilma)<br/>projects, frameworks, DPS"]
+        F2["Award notices<br/>winners = subcontract leads"]
+        F3["Broker assignments<br/>public pages or pasted links"]
+        F4["EU funding calls"]
+        N["Polite fetching, normalise,<br/>dedup, deadline lifecycle"]
         F1 --> N
         F2 --> N
         F3 --> N
+        F4 --> N
     end
 
-    subgraph P["Your offer"]
+    subgraph P["Your company"]
         direction TB
-        CV["CV, GitHub, LinkedIn"]
-        SV["Services you sell<br/>backend, AI, ..."]
-        PX["Consultant profile"]
+        CV["CVs, GitHub, references"]
+        SV["Services, stack, turnover,<br/>certifications, languages"]
+        PX["Company profile"]
         CV --> PX
         SV --> PX
     end
 
-    R["Retrieve<br/>company ↔ offer similarity<br/>kNN + hard filters"]
-    C["Classify<br/>direct client · subcontracting partner ·<br/>partner network · project"]
-    RE["Reason<br/>local LLM: need signal,<br/>stack fit, reachability"]
-    RK["Rank<br/>client fit % in code"]
-    UI["Fit and gaps<br/>why this company, what's missing"]
-    T["Sales pipeline<br/>prospect → contacted → meeting →<br/>proposal → won / lost"]
+    R["Retrieve<br/>opportunity ↔ company similarity<br/>kNN + hard filters"]
+    C["Classify<br/>project · framework / DPS ·<br/>broker assignment · subcontract"]
+    RE["Reason<br/>local LLM: requirements met?<br/>qualify? bid alone or partner?"]
+    RK["Rank<br/>bid fit % in code"]
+    UI["Fit and gaps<br/>why this one, what's missing"]
+    T["Bid pipeline<br/>found → qualifying → bid →<br/>submitted → won / lost"]
 
     N --> R
     PX --> R
@@ -150,41 +154,43 @@ flowchart LR
     classDef extended fill:#fef3c7,stroke:#d97706,color:#78350f
     classDef new fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
     class N,CV,R,RE,RK reused
-    class F2,PX,UI,T extended
-    class F1,F3,SV,C new
+    class F3,PX,UI,T extended
+    class F1,F2,F4,SV,C new
 ```
 
 **Legend:** green is reused as it is, amber is extended, blue is new.
 
 | Stage | Job Matcher | Client Matcher | Reuse |
 |---|---|---|---|
-| Ingest | Job postings from 35 sources | Finnish companies, their hiring and public tenders | Polite fetching, budgets, normalisation and entity resolution reused; company sources new |
-| Profile | You as a candidate | You as a consultant, plus the services you sell | Extended |
-| Retrieve | Job ↔ profile similarity | Company ↔ offer similarity | Reused |
-| Classify | Not needed | Direct client, subcontracting partner, partner network or project | New |
-| Reason | Skill match per job | Need signal, stack fit, language and location reach | Same pattern: the LLM classifies, output is schema-validated |
-| Rank | Match % | Client fit % | Same weighted code, new weights |
-| Track | Application board | Sales pipeline | Same state machine and event history, new stages |
+| Ingest | Job postings from 35 sources | Tenders, award notices, broker assignments and EU calls | Polite fetching, budgets, dedup and deadline expiry reused; the "paste a link" import covers broker sites behind a login; opportunity sources new |
+| Profile | You as a candidate | Your company: services, stack, references, turnover, certifications | Extended |
+| Retrieve | Job ↔ profile similarity | Opportunity ↔ company similarity | Reused |
+| Classify | Not needed | Project, framework or DPS, broker assignment, subcontract | New |
+| Reason | Skill match per job | Requirements met, qualification, bid alone or with a partner | Same pattern: the LLM classifies, output is schema-validated |
+| Rank | Match % | Bid fit % | Same weighted code, new weights |
+| Track | Application board | Bid pipeline | Same state machine and event history, new stages |
 
-**The four company types.** A direct client buys from you, for example a SaaS company
-hiring backend or AI engineers. A subcontracting partner is a consultancy that places you
-with its own clients. A partner network brokers consultants to many buyers. A project is
-one concrete opportunity, such as a tender or a fixed-term contract posting.
+**The four kinds of opportunity.** A project is one tender, one lot or one call. A
+framework or DPS is a place on a buyer's supplier list, joined once, with
+mini-competitions after. A broker assignment comes from a consultant broker's
+marketplace. A subcontract is work under a larger supplier, found through award notices
+that name the winner. Companies that hire engineers stay a slower fifth route, from the
+job data Job Matcher already collects.
 
-**Data model, roughly.** `companies` gains a business ID, industry and type. New tables
-hold company signals (a hiring post, a tender, a funding round), client scores per
-consultant profile, and deals with their events, following the same pattern as
-`applications` and `application_events`.
+**Data model, roughly.** An `opportunities` table holds buyer, country, deadline, value,
+CPV codes, lots and subcontracting terms, with sources and lifecycle like `jobs`. A
+company profile sits beside the personal one. Bid fit scores follow `match_scores`, and
+bids with their events follow `applications` and `application_events`.
 
-**The same rules hold.** Free sources only, the local LLM only, polite fetching, nothing
-hard deleted, and an "unscored" result rather than a guessed number. The app never sends
-emails or messages; contacting a company is always done by you.
+**The same rules hold.** Free sources only, the local LLM only, polite fetching, public
+pages only (never a logged-in session), nothing hard deleted, and an "unscored" result
+rather than a guessed number. The app never submits a bid or sends a message; you do.
 
 ### Open questions
 
-- Which free Finnish sources to use. Candidates to check: the PRH/YTJ open data API for
-  the business registry, Hilma for Finnish public tenders, TED for EU tenders, and Finnish
-  companies' career pages (many use Teamtailor, which is already supported).
-- How to tell a consultancy from a product company reliably: industry codes, website text,
-  or both.
-- The client fit weights, and which signals count as a real need.
+- Sources are researched in [CLIENT_SOURCES.md](CLIENT_SOURCES.md), with a suggested
+  order: TED first, then broker assignments, national portals, EU calls and direct
+  clients. Rows based on third-party guides still need checking against official docs.
+- Brainville's terms of use, and whether other brokers show any assignments without a
+  login.
+- What the company profile needs for qualification checks, and the bid fit weights.
