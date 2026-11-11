@@ -300,29 +300,18 @@ class SitemapBoard(BoardCrawler):
         # Only a full listing can show that a posting was removed.
         result = FetchResult(complete_scopes={self.name} if complete else set())
         result.still_listed = {u for u in pages if u in known}
-        await self.read_pages(ctx, self.pick(ctx, pages, known), result)
-        result.requests = ctx.http.requests
-        return result
-
-
-class ListingBoard(BoardCrawler):
-    """A board with no jobs sitemap: posting links are read from its listing pages."""
-
-    listing_pages: list[str]
-    link_pattern: re.Pattern
-
-    async def fetch(self, ctx: FetchContext) -> FetchResult:
-        pages: list[str] = []
-        for listing in self.listing_pages:
-            html = await ctx.http.get_text(listing, cache_ttl_s=1800)
-            for href in re.findall(r'href="([^"#]+)"', html):
-                full = urljoin(listing, href)
-                if self.link_pattern.search(full) and full not in pages:
-                    pages.append(full)
-        known = self.known_urls(ctx)
-        result = FetchResult()  # listing pages show only the newest postings
-        result.still_listed = {u for u in pages if u in known}
-        await self.read_pages(ctx, self.pick(ctx, pages, known), result)
+        todo = self.pick(ctx, pages, known)
+        if pages and not todo:
+            # The sitemap answered; there was just nothing to read. An empty sitemap still
+            # counts as 0 jobs, so a board that stops listing postings shows red.
+            fresh = [p for p in pages if p not in known]
+            result.idle_reason = (
+                f"None of its {len(pages):,} live postings match your saved searches"
+                if fresh and self.filter_by_searches
+                else f"No new postings since the last run ({len(result.still_listed):,} "
+                "still listed)"
+            )
+        await self.read_pages(ctx, todo, result)
         result.requests = ctx.http.requests
         return result
 
@@ -349,14 +338,6 @@ class JobsNepal(SitemapBoard):
     via = "Sitemap + microdata"
     sitemap = "https://www.jobsnepal.com/sitemap.xml"
     child_filter = "jobs-sitemap"
-
-
-class Jobejee(ListingBoard):
-    name = "jobejee"
-    label = "Jobejee"
-    via = "Listing + JobPosting"
-    listing_pages = ["https://jobejee.com/"]
-    link_pattern = re.compile(r"jobejee\.com/job/[^/]+/\d+$")
 
 
 class Internshala(SitemapBoard):
@@ -447,5 +428,5 @@ class CompanySites(Source):
 
 
 CRAWL_SOURCES = [
-    Merojob, Kumarijob, JobsNepal, Jobejee, Internshala, Shine, Freshersworld, CompanySites,
+    Merojob, Kumarijob, JobsNepal, Internshala, Shine, Freshersworld, CompanySites,
 ]  # fmt: skip

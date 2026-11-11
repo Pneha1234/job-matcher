@@ -25,7 +25,7 @@ SENIORITY_GAP_CAP = 50
 # RemoteOK appends this note for human applicants to every description; it says nothing
 # about the job.
 APPLICANT_NOTE = re.compile(r"Please mention the word \*\*\w+\*\*.*", re.S)
-# Some sources send only the start of a posting (RemoteOK's API, Jobejee's listing page).
+# Some sources send only the start of a posting (RemoteOK's API, Reed's search results).
 # The model then has no requirements to read and fills the list from the profile, so a
 # cut-off text below this length is not scored. HN posts end in shortened links ("...")
 # and are complete, so a text whose last word is a link doesn't count.

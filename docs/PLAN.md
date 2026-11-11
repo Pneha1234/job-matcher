@@ -97,7 +97,7 @@ Large IT services companies (TCS, Infosys, Wipro, HCL…) only via custom
 scrapers for the ones you care about, and never behind a login.
 
 ### Nepal
-HTML scrapers for Merojob, JobsNepal, Kumarijob, Jobejee; Lok Sewa Aayog
+HTML scrapers for Merojob, JobsNepal, Kumarijob (Jobejee retired 2026-11-11); Lok Sewa Aayog
 (psc.gov.np) PDF notices read by the LLM. Nepali tech companies (Leapfrog,
 F1Soft, Fusemachines, CloudFactory, Deerwalk, LogPoint, Cotiviti Nepal, Verisk
 Nepal…) added to the company crawl list by hand. Facebook groups are out of
@@ -244,7 +244,7 @@ own profile, a week of daily use, three unattended days) are not claimed here.
 | 0 | Done | `make dev`, `make check`, `make smoke` (real Ollama round-trip) |
 | 1 | Built, needs your resume | Wizard: PDF/DOCX upload, GitHub (public API), portfolio (`trafilatura`), LinkedIn export ZIP, live progress, review/edit with per-skill provenance, diff vs previous version, versions kept and switchable. Checked end to end in the browser with a sample resume on qwen2.5:14b |
 | 2 | Built | JobSpy: LinkedIn (guest), Indeed, Glassdoor, Google Jobs, Naukri, one source each, driven by saved searches. A live run stored 51 LinkedIn jobs for two searches; the ≥500 target comes with more searches |
-| 3 | Partly built | ATS: Greenhouse, Lever, Ashby, Workable, Recruitee, Personio, SmartRecruiters, Teamtailor, Workday. Free-key APIs: Adzuna, Jooble, Reed, USAJobs, France Travail. Feeds: Remotive, RemoteOK, Arbeitnow, Himalayas, Jobicy, We Work Remotely, HN Who's Hiring, JobTech (Sweden). Nepal: Merojob, Kumarijob, JobsNepal, Jobejee. India: Shine, Internshala, Freshersworld. Company sites (JSON-LD or microdata), Common Crawl discovery, self-growth. One live pass over 15 sources with 7 seed boards stored 1,531 active jobs; the 52 seed boards alone list about 9,000. Not built: see "Not built yet" |
+| 3 | Partly built | ATS: Greenhouse, Lever, Ashby, Workable, Recruitee, Personio, SmartRecruiters, Teamtailor, Workday. Free-key APIs: Adzuna, Jooble, Reed, USAJobs, France Travail. Feeds: Remotive, RemoteOK, Arbeitnow, Himalayas, Jobicy, We Work Remotely, HN Who's Hiring, JobTech (Sweden). Nepal: Merojob, Kumarijob, JobsNepal (Jobejee retired 2026-11-11). India: Shine, Internshala, Freshersworld. Company sites (JSON-LD or microdata), Common Crawl discovery, self-growth. One live pass over 15 sources with 7 seed boards stored 1,531 active jobs; the 52 seed boards alone list about 9,000. Not built: see "Not built yet" |
 | 4 | Built | Salary (k, ranges, LPA, lakh/crore, NPR/Rs on Nepali boards, hourly/monthly), ECB FX with the NPR peg, GeoNames cities15000 with aliases and ambiguity rules, remote scopes, visa, relocation, job type, language requirements, India fields, canonical-key dedup plus conservative embedding-similarity merging. A 25-job spot check found four bugs, all fixed with tests; a 50-job check is yours to do |
 | 5 | Built | Stage A embeddings + hard filters, Stage B validated LLM assessment, % in code, cached per (job, profile version), unscored + retry, weights re-rank instantly |
 | 6 | Built | Two missed complete listings → expired with reason; deadlines; 45-day stale; daily URL checks of scraped jobs; re-listing reactivates |
@@ -456,3 +456,16 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   US) whose saved searches are all elsewhere; those APIs now skip such searches instead
   of spending requests on them. Idle runs are left out when health looks for a source
   that stopped returning jobs, so a real breakage still shows red.
+- 2026-11-11 — Sitemap boards whose sitemap answered but left nothing to read are idle
+  too: "No new postings since the last run" when every live posting is already stored,
+  "None of its N live postings match your saved searches" on the boards filtered by
+  search words. Freshersworld showed red for five runs this way: its 1,511 live postings
+  had no URL with every word of "Python developer" or "Backend engineer". An empty
+  sitemap still counts as 0 jobs and turns red.
+- 2026-11-11 — Jobejee is retired, as IIMJobs and Hirist were never built: since about
+  2026-11-10 its site is a JavaScript app whose job data comes only from a private API
+  (`api.v1.jobejee.com`, with an OAuth token endpoint), and every page, old postings
+  included, returns the same empty shell. Reading that API would go round how the site
+  publishes its jobs. The source is removed; migration 6 expires the 32 jobs found only on
+  Jobejee with a reason (none tracked, none deleted) and marks its links gone. Nepal is
+  still covered by Merojob, Kumarijob and JobsNepal.

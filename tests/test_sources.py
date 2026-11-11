@@ -388,18 +388,84 @@ def test_robots_disallow_is_respected(tmp_path):
     assert job not in calls and result["found"] == 0 and "robots.txt" in result["error"]
 
 
-def test_listing_board(tmp_path):
+FW_INDEX = (
+    '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+    "<sitemap><loc>https://www.freshersworld.com/sitemap-activejobs-1.xml</loc></sitemap>"
+    "</sitemapindex>"
+)
+
+
+def _freshersworld(tmp_path, *pages):
     conn = init_db(tmp_path / "jm.db")
-    home = '<a href="/job/Graphic-Designer/48536">x</a><a href="/about">y</a>'
-    job = "https://jobejee.com/job/Graphic-Designer/48536"
+    with conn:
+        conn.execute(
+            "INSERT INTO saved_searches (name, filters) VALUES "
+            '(\'x\', \'{"query": "Python developer", "location": "Pune"}\')'
+        )
     routes = {
-        "https://jobejee.com/robots.txt": httpx.Response(200, text="User-agent: *\nAllow: /"),
-        "https://jobejee.com/job/": httpx.Response(200, text=MEROJOB_PAGE),
-        "https://jobejee.com/": httpx.Response(200, text=home),
+        "https://www.freshersworld.com/robots.txt": httpx.Response(200, text="User-agent: *"),
+        "https://www.freshersworld.com/sitemap-index.xml": httpx.Response(200, text=FW_INDEX),
+        "https://www.freshersworld.com/sitemap-activejobs-1.xml": httpx.Response(
+            200, text=sitemap(*pages)
+        ),
     }
-    result, calls = run(conn, "jobejee", routes)
-    assert result["found"] == 1 and job in calls
-    assert not any(c.endswith("/about") for c in calls)
+    return conn, routes
+
+
+def test_board_with_no_matching_postings_is_idle(tmp_path):
+    other = "https://www.freshersworld.com/jobs/accountant-jobs-opening-at-pune-2"
+    conn, routes = _freshersworld(tmp_path, other)
+    for _ in range(3):
+        result, calls = run(conn, "freshersworld", routes)
+    assert result["found"] == 0 and other not in calls
+    row = _health_of(conn, "freshersworld")
+    assert row["health"] == "idle" and "1 live postings match" in row["detail"]
+
+
+def test_board_with_nothing_new_is_idle(tmp_path):
+    py = "https://www.freshersworld.com/jobs/python-developer-jobs-opening-at-pune-1"
+    conn, routes = _freshersworld(tmp_path, py)
+    routes[py] = httpx.Response(200, text=MEROJOB_PAGE.replace("Leapfrog", "Acme"))
+    first, _ = run(conn, "freshersworld", routes)
+    again, calls = run(conn, "freshersworld", routes)
+    assert first["found"] == 1 and again["found"] == 0 and py not in calls
+    assert "No new postings since the last run (1 still listed)" in again["error"]
+    assert _health_of(conn, "freshersworld")["health"] == "idle"
+
+
+def test_empty_sitemap_still_shows_broken(tmp_path):
+    conn, routes = _freshersworld(tmp_path)
+    for _ in range(3):
+        result, _ = run(conn, "freshersworld", routes)
+    assert "0 jobs" in result["error"]
+    assert _health_of(conn, "freshersworld")["health"] == "broken"
+
+
+def test_jobejee_is_retired_and_its_jobs_expire(tmp_path):
+    from app.db import MIGRATIONS
+
+    conn = init_db(tmp_path / "jm.db")
+    with conn:
+        for n, src in ((1, "jobejee"), (2, "jobejee"), (2, "merojob")):
+            conn.execute(
+                "INSERT OR IGNORE INTO jobs (id, canonical_key, title, company_name) "
+                "VALUES (?, ?, 'Dev', 'Co')",
+                (n, f"co|dev{n}"),
+            )
+            conn.execute(
+                "INSERT INTO job_sources (job_id, source, url, source_job_id) VALUES (?, ?, ?, ?)",
+                (n, src, f"https://x/{n}/{src}", f"{n}-{src}"),
+            )
+    conn.executescript(f"BEGIN;\n{MIGRATIONS[5]}\nCOMMIT;")
+    status = dict(conn.execute("SELECT id, status FROM jobs").fetchall())
+    assert status == {1: "expired", 2: "active"}  # job 2 is still on Merojob
+    assert "jobejee" not in {r["name"] for r in _rows(conn)}
+
+
+def _rows(conn):
+    from app.sources.health import source_rows
+
+    return source_rows(conn, {})
 
 
 TEAMTAILOR_RSS = """<?xml version="1.0" encoding="UTF-8"?>

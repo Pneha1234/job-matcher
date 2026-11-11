@@ -48,7 +48,7 @@ schedules, model, currency, notifications and optional free API keys.
     Hacker News "Who is hiring" and JobTech.
   - **Logged-out job boards** via [JobSpy](https://github.com/speedyapply/JobSpy):
     LinkedIn guest pages, Indeed, Glassdoor, Google Jobs and Naukri.
-  - **Nepal:** Merojob, Kumarijob, JobsNepal and Jobejee.
+  - **Nepal:** Merojob, Kumarijob and JobsNepal.
   - **India:** Shine, Internshala and Freshersworld.
   - **Optional free-key APIs:** Adzuna, Jooble, Reed, USAJobs and France Travail.
 - **Normalisation.** Salaries are converted to annual amounts in your currency (including

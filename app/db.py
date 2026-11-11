@@ -261,6 +261,18 @@ MIGRATIONS: list[str] = [
     """
     ALTER TABLE scrape_runs ADD COLUMN idle INTEGER NOT NULL DEFAULT 0 CHECK (idle IN (0, 1));
     """,
+    # 6 — Jobejee is retired: its pages became a JavaScript app fed by a private API, and
+    # every old posting URL now answers 200 with the same shell, so its jobs would never
+    # expire on their own. Jobs listed nowhere else expire with a reason; none is deleted.
+    """
+    UPDATE jobs SET status = 'expired',
+        expired_reason = 'Jobejee no longer publishes postings this app can read',
+        updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+    WHERE status != 'expired'
+      AND id IN (SELECT job_id FROM job_sources WHERE source = 'jobejee')
+      AND id NOT IN (SELECT job_id FROM job_sources WHERE source != 'jobejee');
+    UPDATE job_sources SET status = 'gone' WHERE source = 'jobejee';
+    """,
 ]
 
 
