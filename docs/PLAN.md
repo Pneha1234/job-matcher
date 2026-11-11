@@ -445,3 +445,14 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   looking at principal roles is a stretch, not a mismatch (decided on 2026-11-09).
   Existing scores were recomputed from their stored assessments, no LLM calls: the
   intern role went from 94% to 50%, principal roles to 78–82%.
+- 2026-11-11 — One company board failing no longer fails its whole source. A single
+  Workday board (The Gym Group) answered 500 on every run, and the error stopped the run,
+  so no Workday jobs were stored at all. A board that answers with a server error or times
+  out is now skipped with a note and stays active (it isn't dead); blocks and 429s still
+  pause the source. The next Workday run stored 77 jobs.
+- 2026-11-11 — A run with nothing to do is shown as "Nothing to do", not "Broken".
+  `scrape_runs.idle` (migration 5) marks runs with no saved search, no company boards,
+  boards that answered in full with no openings, and one-country APIs (Reed: UK, USAJobs:
+  US) whose saved searches are all elsewhere; those APIs now skip such searches instead
+  of spending requests on them. Idle runs are left out when health looks for a source
+  that stopped returning jobs, so a real breakage still shows red.

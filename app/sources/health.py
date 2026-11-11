@@ -18,6 +18,10 @@ def _health(
     if not runs:
         return "never", None
     last = runs[0]
+    if last["idle"]:
+        return "idle", last["error_text"]
+    # Runs that had nothing to do say nothing about whether the site still works.
+    runs = [r for r in runs if not r["idle"]]
     if last["status"] == "error":
         return "broken", last["error_text"]
     if last["status"] == "paused":

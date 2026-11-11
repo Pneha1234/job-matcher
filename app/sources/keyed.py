@@ -28,6 +28,14 @@ def search_country(search: dict, fallback: list[str]) -> str | None:
     return fallback[0] if fallback else None
 
 
+def searches_in(ctx: FetchContext, country: str) -> list[dict]:
+    """Saved searches a one-country API can answer: those placed in that country, plus
+    any without a place or with one we can't resolve."""
+    return [
+        s for s in ctx.searches if not s.get("location") or search_country(s, []) in (None, country)
+    ]
+
+
 class KeyedSource(Source):
     kind = "feed"
     group = "feeds"
@@ -129,7 +137,13 @@ class Reed(KeyedSource):
         token = base64.b64encode(f"{ctx.api_key}:".encode()).decode()
         headers = {"Authorization": f"Basic {token}"}  # the key is the username
         found: dict[str, dict] = {}
-        for search in ctx.searches:
+        searches = searches_in(ctx, "GB")
+        if not searches:
+            result.idle_reason = (
+                "Reed only covers the UK, and none of your saved searches are there"
+            )
+            return result
+        for search in searches:
             params = {"keywords": search["query"], "resultsToTake": 100}
             if search.get("location"):
                 params["locationName"] = search["location"]
@@ -210,7 +224,13 @@ class USAJobs(KeyedSource):
         email, key = _split(ctx.api_key or "", "|")
         headers = {"Authorization-Key": key, "User-Agent": email, "Host": "data.usajobs.gov"}
         result = FetchResult()
-        for search in ctx.searches:
+        searches = searches_in(ctx, "US")
+        if not searches:
+            result.idle_reason = (
+                "USAJobs only covers US federal jobs, and none of your saved searches are there"
+            )
+            return result
+        for search in searches:
             params = {"Keyword": search["query"], "ResultsPerPage": 100}
             if search.get("location"):
                 params["LocationName"] = search["location"]

@@ -529,3 +529,61 @@ def test_reed_dates_are_day_first():
 
     assert _reed_date("25/10/2026").date().isoformat() == "2026-10-25"
     assert _reed_date(None) is None
+
+
+def _health_of(conn, name):
+    from app.sources.health import source_rows
+
+    return next(r for r in source_rows(conn, {}) if r["name"] == name)
+
+
+def test_one_board_failing_does_not_lose_the_others(conn):
+    with conn:
+        conn.execute(
+            "INSERT INTO companies (name, platform, slug) VALUES ('Gym', 'greenhouse', 'gym')"
+        )
+    routes = {
+        "https://boards-api.greenhouse.io/v1/boards/acme/jobs": httpx.Response(
+            200, json=GREENHOUSE
+        ),
+        "https://boards-api.greenhouse.io/v1/boards/gym/jobs": httpx.Response(500, text="oops"),
+    }
+    result, _ = run(conn, "greenhouse", routes)
+    assert result["status"] == "ok" and result["found"] == 2
+    assert "gym: 500, skipped" in result["error"]
+    gym = conn.execute("SELECT status FROM companies WHERE slug = 'gym'").fetchone()
+    assert gym["status"] == "active"  # a server error is not a dead board
+
+
+def test_no_saved_search_is_idle_not_broken(tmp_path):
+    conn = init_db(tmp_path / "jm.db")
+    for _ in range(3):
+        result, calls = run(conn, "jobspy_indeed", {})
+    assert result["status"] == "ok" and calls == []
+    row = _health_of(conn, "jobspy_indeed")
+    assert row["health"] == "idle" and "saved search" in row["detail"]
+
+
+def test_board_with_no_openings_is_idle(conn):
+    empty = {"https://boards-api.greenhouse.io/v1/boards/acme/jobs": httpx.Response(
+        200, json={"jobs": []})}  # fmt: skip
+    for _ in range(3):
+        run(conn, "greenhouse", empty)
+    row = _health_of(conn, "greenhouse")
+    assert row["health"] == "idle" and "no open jobs" in row["detail"]
+
+
+def test_one_country_api_skips_searches_elsewhere(tmp_path):
+    from app.settings_store import set_value
+
+    conn = init_db(tmp_path / "jm.db")
+    set_value(conn, "api_keys", {"reed": "k"})
+    with conn:
+        conn.execute(
+            "INSERT INTO saved_searches (name, filters) VALUES "
+            '(\'x\', \'{"query": "Python developer", "location": "Amsterdam"}\')'
+        )
+    result, calls = run(conn, "reed", {})
+    assert result["status"] == "ok" and calls == []
+    row = _health_of(conn, "reed")
+    assert row["health"] == "idle" and "only covers the UK" in row["detail"]

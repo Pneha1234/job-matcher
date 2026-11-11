@@ -256,6 +256,11 @@ MIGRATIONS: list[str] = [
     ALTER TABLE job_locations ADD COLUMN utc_offset_min INTEGER;
     CREATE INDEX job_locations_latlon ON job_locations (lat, lon);
     """,
+    # 5 — a run that had nothing to do (no saved search it covers, an empty board list) is
+    # not a fault and shows neutral on the Sources page
+    """
+    ALTER TABLE scrape_runs ADD COLUMN idle INTEGER NOT NULL DEFAULT 0 CHECK (idle IN (0, 1));
+    """,
 ]
 
 

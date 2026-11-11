@@ -6,6 +6,8 @@ import xml.etree.ElementTree as ET
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 
+import httpx
+
 from app.normalize.classify import html_to_text
 from app.sources.base import FetchContext, FetchResult, NotFound, RawJob, Source
 
@@ -49,6 +51,12 @@ class BoardSource(Source):
                 continue
             except (ValueError, KeyError, ET.ParseError) as e:
                 result.errors.append(f"{slug}: unexpected response ({e.__class__.__name__})")
+                continue
+            except (httpx.HTTPStatusError, httpx.TransportError) as e:
+                # One company's server failing (a Workday 500, a timeout) must not lose
+                # every other board's jobs. Blocks and 429s still pause the whole source.
+                code = e.response.status_code if isinstance(e, httpx.HTTPStatusError) else None
+                result.errors.append(f"{slug}: {code or e.__class__.__name__}, skipped")
                 continue
             for job in jobs:
                 job.scope = slug

@@ -61,6 +61,9 @@ class FetchResult:
     requests: int = 0
     # source_job_ids confirmed listed without fetching their pages again (sitemaps).
     still_listed: set[str] = field(default_factory=set)
+    # Set when the source had nothing to do (no saved search in the country it covers):
+    # a 0-job run that is not a fault, shown neutral on the Sources page.
+    idle_reason: str | None = None
 
 
 class SourceBlocked(Exception):

@@ -125,11 +125,12 @@ async def run_source(
         api_key=api_key,
     )
     status, error_text, result = "ok", None, None
+    idle = False  # nothing to do is not a fault; see FetchResult.idle_reason
     try:
         if source.needs_searches and not ctx.searches:
-            status, error_text = "error", "Add a saved search in Settings first"
+            idle, error_text = True, "Add a saved search in Settings first"
         elif source.platform and not companies:
-            status, error_text = "ok", "No company boards on the crawl list yet"
+            idle, error_text = True, "No company boards on the crawl list yet"
         else:
             result = await source.fetch(ctx)
     except SourceBlocked as e:
@@ -171,14 +172,20 @@ async def run_source(
         errors += len(result.errors)
         if result.errors and not error_text:
             error_text = "; ".join(result.errors[:3])
-        if found == 0 and status == "ok" and not error_text:
-            error_text = "0 jobs returned. The site may have changed."
+        if found == 0 and status == "ok":
+            if result.idle_reason:
+                idle, error_text = True, result.idle_reason
+            elif source.platform and result.complete_scopes and not result.errors:
+                # Every board answered in full and simply has no openings today.
+                idle, error_text = True, "Its company boards have no open jobs right now"
+            elif not error_text:
+                error_text = "0 jobs returned. The site may have changed."
 
     with conn:
         conn.execute(
             "UPDATE scrape_runs SET finished_at = ?, status = ?, found = ?, new = ?, errors = ?, "
-            "budget_used = ?, error_text = ? WHERE id = ?",
-            (now_iso(), status, found, new, errors, http.requests, error_text, run_id),
+            "budget_used = ?, error_text = ?, idle = ? WHERE id = ?",
+            (now_iso(), status, found, new, errors, http.requests, error_text, int(idle), run_id),
         )
     return {
         "source": name,

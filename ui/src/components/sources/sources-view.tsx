@@ -16,6 +16,7 @@ const HEALTH: Record<SourceRow["health"], { tone: "ok" | "warn" | "bad" | "plain
   paused: { tone: "plain", label: "Paused" },
   never: { tone: "plain", label: "Not run yet" },
   needs_key: { tone: "plain", label: "Needs a free key" },
+  idle: { tone: "plain", label: "Nothing to do" },
 };
 
 function RunButton({ row }: { row: SourceRow }) {
