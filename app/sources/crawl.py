@@ -8,6 +8,7 @@ import html
 import json
 import re
 import xml.etree.ElementTree as ET
+from datetime import timedelta
 from urllib.parse import urljoin, urlparse
 
 from selectolax.lexbor import LexborHTMLParser
@@ -15,6 +16,10 @@ from selectolax.lexbor import LexborHTMLParser
 from app.normalize.classify import html_to_text
 from app.sources.ats import _dt
 from app.sources.base import FetchContext, FetchResult, NotFound, RawJob, Source
+from app.util import iso, now_iso, utcnow
+
+# How long a posting page that couldn't be used is left alone before it is tried again.
+SKIP_DAYS = 7
 
 LD_RE = re.compile(r"<script[^>]*application/ld\+json[^>]*>(.*?)</script>", re.S | re.I)
 DESCRIPTION_RE = re.compile(r'("description"\s*:\s*")(.*?)("\s*,\s*\n\s*"[@\w]+"\s*:)', re.S)
@@ -243,8 +248,30 @@ class BoardCrawler(Source):
             )
         }
 
+    def skipped_urls(self, ctx: FetchContext) -> set[str]:
+        return {
+            r["url"]
+            for r in ctx.conn.execute(
+                "SELECT url FROM skipped_pages WHERE source = ? AND until > ?",
+                (self.name, now_iso()),
+            )
+        }
+
+    def skip(self, ctx: FetchContext, url: str, reason: str) -> None:
+        # A page that had no job data (or was disallowed, or gone) would otherwise count as
+        # new on every run and fail again; Internshala retried one for six runs. A site that
+        # drops its markup everywhere still fails on each fresh page, so it still shows red.
+        with ctx.conn:
+            ctx.conn.execute(
+                "INSERT INTO skipped_pages (source, url, reason, until) VALUES (?, ?, ?, ?) "
+                "ON CONFLICT (source, url) DO UPDATE SET reason = excluded.reason, "
+                "until = excluded.until",
+                (self.name, url, reason, iso(utcnow() + timedelta(days=SKIP_DAYS))),
+            )
+
     def pick(self, ctx: FetchContext, pages: list[str], known: set[str]) -> list[str]:
-        fresh = [p for p in pages if p not in known]
+        skipped = self.skipped_urls(ctx)
+        fresh = [p for p in pages if p not in known and p not in skipped]
         if self.filter_by_searches:
             terms = search_terms(ctx.searches)
             fresh = [p for p in fresh if matches_search(p, terms)] if terms else []
@@ -254,14 +281,17 @@ class BoardCrawler(Source):
         for url in urls:
             if not await ctx.http.allowed(url):
                 result.errors.append(f"robots.txt disallows {url}")
+                self.skip(ctx, url, "robots.txt disallows it")
                 continue
             try:
                 html = await ctx.http.get_text(url, cache_ttl_s=24 * 3600)
             except NotFound:
+                self.skip(ctx, url, "not found")
                 continue
             postings = job_postings(html)
             if not postings:
                 result.errors.append(f"No JobPosting markup on {url}")
+                self.skip(ctx, url, "no JobPosting markup")
                 continue
             job = raw_from_posting(
                 postings[0], url, self.name, country_hint=self.country, scope=self.name
@@ -304,13 +334,17 @@ class SitemapBoard(BoardCrawler):
         if pages and not todo:
             # The sitemap answered; there was just nothing to read. An empty sitemap still
             # counts as 0 jobs, so a board that stops listing postings shows red.
-            fresh = [p for p in pages if p not in known]
+            skipped = self.skipped_urls(ctx)
+            fresh = [p for p in pages if p not in known and p not in skipped]
             result.idle_reason = (
                 f"None of its {len(pages):,} live postings match your saved searches"
                 if fresh and self.filter_by_searches
                 else f"No new postings since the last run ({len(result.still_listed):,} "
                 "still listed)"
             )
+            if skipped & set(pages):
+                n = len(skipped & set(pages))
+                result.idle_reason += f"; {n:,} without job data skipped for now"
         await self.read_pages(ctx, todo, result)
         result.requests = ctx.http.requests
         return result

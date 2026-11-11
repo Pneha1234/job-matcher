@@ -273,6 +273,17 @@ MIGRATIONS: list[str] = [
       AND id NOT IN (SELECT job_id FROM job_sources WHERE source != 'jobejee');
     UPDATE job_sources SET status = 'gone' WHERE source = 'jobejee';
     """,
+    # 7 — posting pages a crawl couldn't use (no JobPosting data, robots.txt, gone) are
+    # skipped for a while instead of being fetched and failing again on every run
+    """
+    CREATE TABLE skipped_pages (
+        source  TEXT NOT NULL,
+        url     TEXT NOT NULL,
+        reason  TEXT NOT NULL,
+        until   TEXT NOT NULL,
+        PRIMARY KEY (source, url)
+    );
+    """,
 ]
 
 

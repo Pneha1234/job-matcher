@@ -653,3 +653,19 @@ def test_one_country_api_skips_searches_elsewhere(tmp_path):
     assert result["status"] == "ok" and calls == []
     row = _health_of(conn, "reed")
     assert row["health"] == "idle" and "only covers the UK" in row["detail"]
+
+
+def test_page_without_job_data_is_skipped_for_a_while(tmp_path):
+    py = "https://www.freshersworld.com/jobs/python-developer-jobs-opening-at-pune-1"
+    conn, routes = _freshersworld(tmp_path, py)
+    routes[py] = httpx.Response(200, text="<html><h1>Python Developer</h1></html>")
+    first, calls = run(conn, "freshersworld", routes)
+    assert py in calls and "No JobPosting markup" in first["error"]
+    again, calls = run(conn, "freshersworld", routes)
+    assert py not in calls and "1 without job data skipped" in again["error"]
+    assert _health_of(conn, "freshersworld")["health"] == "idle"
+    # After the skip runs out the page is tried again.
+    with conn:
+        conn.execute("UPDATE skipped_pages SET until = '2000-01-01T00:00:00Z'")
+    third, _ = run(conn, "freshersworld", routes)  # the page itself comes from the disk cache
+    assert "No JobPosting markup" in third["error"]

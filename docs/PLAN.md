@@ -469,3 +469,10 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   publishes its jobs. The source is removed; migration 6 expires the 32 jobs found only on
   Jobejee with a reason (none tracked, none deleted) and marks its links gone. Nepal is
   still covered by Merojob, Kumarijob and JobsNepal.
+- 2026-11-11 — A posting page a crawl couldn't use is skipped for 7 days. Internshala
+  picked the same multi-location page on six runs in a row: it matches a saved search but
+  carries no JobPosting data (other Internshala pages do), so it was never stored, counted
+  as new every run, failed, and the board showed red. Pages with no JobPosting data,
+  disallowed by robots.txt, or gone (404) now go into `skipped_pages` (migration 7) and
+  are left alone until the skip runs out, then tried again. A site that drops its markup
+  everywhere still fails on each fresh page, so it still turns red.
