@@ -79,6 +79,7 @@ export function JobDrawerBody({ jobId, weights, currency, onClose }: { jobId: nu
   const app = job.application?.status;
   const open = !app || app === "saved";
   const m = job.match;
+  const posting = job.sources.find((s) => s.status === "listed") ?? job.sources[0];
   const salary = job.salary_annual_max ? salaryRange(job.salary_annual_min, job.salary_annual_max, currency) : job.salary_text;
   const busy = rescore.isPending || (scoring.data && scoring.data.status === "running");
   const places = job.locations.map((l) => (l.city ? `${l.city}${l.country_code ? `, ${l.country_code}` : ""}` : l.country_code || l.raw));
@@ -150,13 +151,27 @@ export function JobDrawerBody({ jobId, weights, currency, onClose }: { jobId: nu
           <div>
             <b>{m?.status === "unscored" ? "Unscored" : "Not scored yet"}</b>
             <div className="mt-1 text-xs text-muted-foreground">
-              {m?.status === "unscored"
-                ? `The local model's answer didn't pass validation, so there's no number. ${m.error ?? ""}`
-                : "Only the best embedding matches get an LLM score automatically. You can score this one now."}
+              {m?.status !== "unscored"
+                ? "Only the best embedding matches get an LLM score automatically. You can score this one now."
+                : m.unscored_by === "source"
+                  ? m.error
+                  : `The local model's answer didn't pass validation, so there's no number. ${m.error ?? ""}`}
             </div>
-            <Btn className="mt-2" disabled={!!busy} onClick={() => rescore.mutate()}>
-              {busy ? "Scoring… (about a minute)" : m?.status === "unscored" ? "Retry scoring" : "Score now"}
-            </Btn>
+            {m?.unscored_by === "source" && posting ? (
+              // Scoring again would read the same short text; the posting itself is the way on.
+              <a
+                href={posting.url}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-block rounded-lg border border-input bg-card px-3 py-1.5 text-sm no-underline hover:bg-muted"
+              >
+                Open posting ↗
+              </a>
+            ) : (
+              <Btn className="mt-2" disabled={!!busy} onClick={() => rescore.mutate()}>
+                {busy ? "Scoring… (about a minute)" : m?.status === "unscored" ? "Retry scoring" : "Score now"}
+              </Btn>
+            )}
             {scoring.data?.status === "error" && <div className="mt-1 text-xs text-bad">{scoring.data.error}</div>}
           </div>
         )}

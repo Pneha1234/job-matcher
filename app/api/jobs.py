@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from app.api.deps import DbDep, OllamaDep, TasksDep
 from app.jobs_query import JobFilters, job_map, list_jobs
 from app.llm import LLMError
-from app.matching.service import score_job, start_rescore
+from app.matching.service import SOURCE_REASONS, score_job, start_rescore
 from app.normalize.geo import load_geo
 from app.profile import store
 from app.settings_store import load as load_settings
@@ -101,6 +101,12 @@ async def job_detail(db: DbDep, job_id: int):
             "missing": loads(score["missing_skills"], []) or [],
             "explanation": score["explanation"],
             "error": score["error"],
+            # "source": the posting had too little text to score; "model": the LLM failed.
+            "unscored_by": (
+                None
+                if score["status"] == "scored"
+                else "source" if score["error"] in SOURCE_REASONS else "model"
+            ),
             "model": score["model"],
             "scored_at": score["scored_at"],
             "version_label": score["label"],

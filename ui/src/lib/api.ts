@@ -92,6 +92,8 @@ export type JobDetail = {
     missing: string[];
     explanation: string | null;
     error: string | null;
+    // "source": the posting had too little text to score, so retrying can't help.
+    unscored_by: "source" | "model" | null;
     model: string | null;
     scored_at: string;
     version_label: string;

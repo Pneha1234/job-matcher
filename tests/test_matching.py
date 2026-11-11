@@ -266,3 +266,14 @@ def test_principal_role_is_not_capped_for_a_senior_profile(client, db, fake_olla
     wait_task(client, client.post(f"/jobs/{job_id}/score").json()["task_id"])
     row = db.execute("SELECT final_pct FROM match_scores WHERE job_id = ?", (job_id,)).fetchone()
     assert row["final_pct"] > 50
+
+
+def test_detail_says_whether_the_source_or_the_model_left_a_job_unscored(client, db, fake_ollama):
+    thin = add_job(db, 1, description="")
+    failed = add_job(db, 2)
+    save_profile(db)
+    fake_ollama.queue("JobAssessment", "garbage", "garbage")
+    for job_id in (thin, failed):
+        wait_task(client, client.post(f"/jobs/{job_id}/score").json()["task_id"])
+    assert client.get(f"/jobs/{thin}").json()["match"]["unscored_by"] == "source"
+    assert client.get(f"/jobs/{failed}").json()["match"]["unscored_by"] == "model"
