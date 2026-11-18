@@ -25,7 +25,8 @@ from app.llm import OllamaClient
 from app.matching.service import start_rescore
 from app.normalize.ingest import backfill_timezones
 from app.security import LocalOnlyMiddleware
-from app.seeds import seed
+from app.seeds import seed, seed_regions
+from app.settings_store import load as load_settings
 from app.tasks import TaskRunner
 
 
@@ -36,6 +37,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.ollama = OllamaClient()
     app.state.tasks = TaskRunner(app.state.db)
     seed(app.state.db)
+    prefs = load_settings(app.state.db)
+    seed_regions(app.state.db, [prefs.home_country, *prefs.target_countries])
     sched = None
     if cfg.scheduler:
         asyncio.create_task(scheduler.first_run_setup(app.state.db))

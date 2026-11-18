@@ -12,6 +12,7 @@ from app.matching.service import reweight
 from app.normalize import fx, geo
 from app.normalize.regions import CITY_GROUPS, REGIONS
 from app.profile import store
+from app.seeds import seed_regions
 from app.settings_store import AppSettings, Weights, get_value, load, save, set_value
 from app.sources.registry import SOURCES
 from app.sources.runner import api_keys
@@ -62,13 +63,14 @@ async def put_settings(db: DbDep, changes: Annotated[dict, Body()]):
     except ValidationError as e:
         raise HTTPException(422, e.errors(include_url=False, include_context=False)) from e
     save(db, body)
+    seeded = seed_regions(db, [body.home_country, *body.target_countries])
     reweighted = 0
     if body.weights != before.weights:
         reweighted = reweight(db, body.weights)
     rates_changed = body.currency != before.currency
     if rates_changed:
         _reconvert_salaries(db, body.currency)
-    return {"settings": body.model_dump(), "reweighted": reweighted}
+    return {"settings": body.model_dump(), "reweighted": reweighted, "boards_added": seeded}
 
 
 def _reconvert_salaries(db, currency: str) -> None:

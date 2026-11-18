@@ -103,6 +103,18 @@ F1Soft, Fusemachines, CloudFactory, Deerwalk, LogPoint, Cotiviti Nepal, Verisk
 Nepal…) added to the company crawl list by hand. Facebook groups are out of
 scope; use the "paste a job link or text" manual import instead.
 
+### Finland
+Finnish tech company boards are seeded when Finland is the home or a target country
+(`REGIONAL_SEEDS` in `app/seeds.py`): Wolt, Oura, RELEX, Solita, Smartly.io,
+Yousician, Housemarque (Greenhouse); Supercell, Reaktor, Sievo (Ashby); IQM (Lever);
+Nitor (Workable); Siili, UpCloud, Wunderdog, Vincit, Holvi (Teamtailor). Each was
+checked on its public endpoint on 2026-11-18. JobSpy's Indeed covers Finland per
+country. Not used: Duunitori and Jobly (Cloudflare bot challenges), The Hub (terms
+allow personal viewing only and forbid copying without consent), and Työmarkkinatori's
+site API (`/api/` is disallowed in robots.txt). Työmarkkinatori's official search API
+needs an organisation to apply to KEHA-keskus and credit each ad; it can be added as a
+keyed source once access is granted.
+
 ### Company discovery (free)
 Common Crawl index queries for every URL under the ATS domains; open-source
 company lists on GitHub; and self-growth — any scraped job that links to a
@@ -476,3 +488,12 @@ own profile, a week of daily use, three unattended days) are not claimed here.
   disallowed by robots.txt, or gone (404) now go into `skipped_pages` (migration 7) and
   are left alone until the skip runs out, then tried again. A site that drops its markup
   everywhere still fails on each fresh page, so it still turns red.
+- 2026-11-18 — Regional board lists, starting with Finland. The first seed list is
+  global, so a Finland search found 43 Finnish jobs in about 10,000. `REGIONAL_SEEDS`
+  adds a country's company boards the first time it is the home or a target country,
+  on startup or when settings are saved, and records it in `seeded_regions`, so an
+  existing database picks the list up once and a removed board isn't re-added. Finnish
+  job sites were checked first and left out for the reasons under "Finland" above.
+- 2026-11-18 — Workable job links are no longer read as company boards. Self-growth
+  turned `apply.workable.com/j/<shortcode>` into a Workable board called `j` (M-Files
+  was stored that way). The board pattern now skips `j/` and `api/` paths.
