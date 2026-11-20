@@ -309,6 +309,13 @@ def test_board_urls():
     assert board_from_url("https://example.com/careers") is None
 
 
+def test_workable_job_links_are_not_boards():
+    assert board_from_url("https://apply.workable.com/nitor/") == ("workable", "nitor")
+    assert board_from_url("https://apply.workable.com/nitor/j/ABC123/") == ("workable", "nitor")
+    assert board_from_url("https://apply.workable.com/j/ABC123") is None
+    assert board_from_url("https://apply.workable.com/api/v1/widget/accounts/x") is None
+
+
 JOBSNEPAL_PAGE = """<html><body>
 <div itemscope itemtype="http://schema.org/JobPosting">
   <h1 itemprop="title">Data   Officer</h1>

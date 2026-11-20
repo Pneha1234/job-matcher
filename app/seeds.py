@@ -26,6 +26,46 @@ NAMES = {"automatticcareers": "Automattic", "grafanalabs": "Grafana Labs", "n26"
          "cloudfactory": "CloudFactory", "career.teamtailor.com": "Teamtailor"}  # fmt: skip
 
 
+REGIONAL_SEEDS = {
+    "FI": {
+        "greenhouse": ["wolt", "oura", "relex", "solita", "smartlyio", "yousician", "housemarque"],
+        "ashby": ["supercell", "reaktor", "sievo"],
+        "lever": ["iqm"],
+        "workable": ["nitor"],
+        "teamtailor": ["siili.teamtailor.com", "upcloud.teamtailor.com", "wunderdog.teamtailor.com",
+                       "vincitoyj.teamtailor.com", "holvi.teamtailor.com"],
+    },
+}  # fmt: skip
+
+REGIONAL_NAMES = {"relex": "RELEX Solutions", "smartlyio": "Smartly.io", "iqm": "IQM",
+                  "siili.teamtailor.com": "Siili Solutions", "upcloud.teamtailor.com": "UpCloud",
+                  "wunderdog.teamtailor.com": "Wunderdog", "vincitoyj.teamtailor.com": "Vincit",
+                  "holvi.teamtailor.com": "Holvi"}  # fmt: skip
+
+
+def seed_regions(conn: sqlite3.Connection, countries: list[str | None]) -> int:
+    """Add each region's company boards once, the first time that country is the user's home
+    or a target, so existing databases pick them up too."""
+    done = set(get_value(conn, "seeded_regions", []) or [])
+    todo = [c for c in dict.fromkeys(c.upper() for c in countries if c) if c in REGIONAL_SEEDS]
+    todo = [c for c in todo if c not in done]
+    if not todo:
+        return 0
+    added = 0
+    with conn:
+        for country in todo:
+            for platform, slugs in REGIONAL_SEEDS[country].items():
+                for s in slugs:
+                    name = REGIONAL_NAMES.get(s, s.split(".")[0].replace("-", " ").title())
+                    cur = conn.execute(
+                        "INSERT OR IGNORE INTO companies (name, platform, slug) VALUES (?, ?, ?)",
+                        (name, platform, s),
+                    )
+                    added += cur.rowcount
+    set_value(conn, "seeded_regions", sorted(done | set(todo)))
+    return added
+
+
 def seed(conn: sqlite3.Connection) -> int:
     if get_value(conn, "seeded"):
         return 0

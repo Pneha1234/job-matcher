@@ -298,3 +298,18 @@ def test_settings_updates_merge_and_reject_unknown_fields(client):
     assert client.put("/settings", json={"bad": 1}).status_code == 422
     assert client.get("/settings").json()["settings"]["home_country"] == "NP"
     assert client.put("/settings", json={"home_country": "Nepal"}).status_code == 422
+
+
+def test_targeting_finland_adds_finnish_company_boards_once(client):
+    def wolt():
+        return [c for c in client.get("/companies").json() if c["slug"] == "wolt"]
+
+    assert wolt() == []
+    r = client.put("/settings", json={"target_countries": ["FI"]}).json()
+    assert r["boards_added"] > 0
+    assert wolt()[0]["platform"] == "greenhouse"
+    # Seeded once: saving again, or with Finland as home too, adds nothing more.
+    assert client.put("/settings", json={"home_country": "FI"}).json()["boards_added"] == 0
+    assert len(wolt()) == 1
+    # A country without a regional list adds nothing.
+    assert client.put("/settings", json={"target_countries": ["NL"]}).json()["boards_added"] == 0

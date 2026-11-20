@@ -490,7 +490,8 @@ BOARD_PATTERNS = [
     (r"boards-api\.greenhouse\.io/v1/boards/([\w-]+)", "greenhouse"),
     (r"jobs\.(?:eu\.)?lever\.co/([\w-]+)", "lever"),
     (r"jobs\.ashbyhq\.com/([\w.-]+)", "ashby"),
-    (r"apply\.workable\.com/([\w-]+)", "workable"),
+    # apply.workable.com/j/<shortcode> is a single job link, not a company's board.
+    (r"apply\.workable\.com/(?!(?:j|api)(?:/|$))([\w-]+)", "workable"),
     (r"([\w-]+)\.recruitee\.com", "recruitee"),
     (r"([\w-]+)\.jobs\.personio\.(?:de|com)", "personio"),
     (r"(?:jobs|careers)\.smartrecruiters\.com/([\w-]+)", "smartrecruiters"),
